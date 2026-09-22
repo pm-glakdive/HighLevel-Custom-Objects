@@ -33,11 +33,39 @@ export interface ServiceCase {
   subject: string
   status: 'Open' | 'In progress' | 'Resolved'
   priority: 'Low' | 'Medium' | 'High'
-  location: string
-  asset: string
+  assetId: string | null
+  agreementId: string | null
   description: string
-  openedAt: string
-  owner: string
+  createdAt: string
+  ownerId: string
+  source: Channel
+  appliedResolutionTargetHours: number | null
+  targetResolutionAt: string | null
+}
+
+export interface CustomerAsset {
+  id: string
+  name: string
+  company: string
+  location: string
+  type: string
+  status: 'Active' | 'Inactive'
+}
+
+export interface ServiceAgreement {
+  id: string
+  name: string
+  status: 'Active' | 'Expired'
+  coveredAssetIds: string[]
+  resolutionTargetHours: number
+  coverage: string
+  renewalDate: string
+}
+
+export interface ServiceUser {
+  id: string
+  name: string
+  role: string
 }
 
 export interface CaseDraft {
@@ -47,7 +75,47 @@ export interface CaseDraft {
   sourceMessageId: string
   subject: string
   description: string
+  assetId: string
+  agreementId: string
+  ownerId: string
+  priority: '' | ServiceCase['priority']
 }
+
+export const assets: CustomerAsset[] = [
+  {
+    id: 'AC-001',
+    name: 'Lobby AC',
+    company: 'Northstar Offices',
+    location: 'Main lobby',
+    type: 'Air conditioner',
+    status: 'Active',
+  },
+  {
+    id: 'AC-002',
+    name: 'Conference-room AC',
+    company: 'Northstar Offices',
+    location: 'Conference room',
+    type: 'Air conditioner',
+    status: 'Active',
+  },
+]
+
+export const agreements: ServiceAgreement[] = [
+  {
+    id: 'AMC-104',
+    name: 'Northstar Annual Maintenance',
+    status: 'Active',
+    coveredAssetIds: ['AC-002'],
+    resolutionTargetHours: 24,
+    coverage: 'On-site AC service and repair',
+    renewalDate: '31 Dec 2026',
+  },
+]
+
+export const serviceUsers: ServiceUser[] = [
+  { id: 'user-priya', name: 'Priya Nair', role: 'Service Agent' },
+  { id: 'user-arun', name: 'Arun Mehta', role: 'Service Manager' },
+]
 
 export const contacts: Contact[] = [
   {
@@ -143,11 +211,14 @@ export const serviceCases: ServiceCase[] = [
     subject: 'Lobby AC leaking',
     status: 'Open',
     priority: 'Medium',
-    location: 'Main lobby',
-    asset: 'Lobby AC unit',
+    assetId: 'AC-001',
+    agreementId: null,
     description: 'Water is leaking from the AC unit in the main lobby. A technician needs to inspect the drain line.',
-    openedAt: '18 Sep 2026',
-    owner: 'Priya Nair',
+    createdAt: '2026-09-18T09:00:00+05:30',
+    ownerId: 'user-priya',
+    source: 'WhatsApp',
+    appliedResolutionTargetHours: null,
+    targetResolutionAt: null,
   },
 ]
 
@@ -160,5 +231,18 @@ export function createCaseDraft(conversation: Conversation): CaseDraft {
     sourceMessageId: latestInboundMessage?.id ?? '',
     subject: 'Conference-room AC not cooling',
     description: latestInboundMessage?.text ?? '',
+    assetId: '',
+    agreementId: '',
+    ownerId: '',
+    priority: '',
   }
+}
+
+export function applicableAgreements(assetId: string): ServiceAgreement[] {
+  return agreements.filter((agreement) => agreement.status === 'Active' && agreement.coveredAssetIds.includes(assetId))
+}
+
+export function nextCaseId(cases: ServiceCase[]): string {
+  const highestNumber = cases.reduce((highest, serviceCase) => Math.max(highest, Number(serviceCase.id.replace('SC-', '')) || 0), 103)
+  return `SC-${highestNumber + 1}`
 }
