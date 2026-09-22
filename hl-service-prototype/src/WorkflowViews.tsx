@@ -29,7 +29,6 @@ interface CaseJourneyProps {
   customerUpdateSent: boolean
   canManage: boolean
   onBack: () => void
-  onStartWork: () => void
   onCreateTask: (subject: string, assigneeId: string, dueAt: string) => void
   onOpenBooking: () => void
   onRecordBooking: (bookingId: string) => void
@@ -42,7 +41,7 @@ interface CaseJourneyProps {
 }
 
 export function CaseJourneyView({
-  serviceCase, allCases, tasks, bookings, activities, customerUpdateSent, canManage, onBack, onStartWork,
+  serviceCase, allCases, tasks, bookings, activities, customerUpdateSent, canManage, onBack,
   onCreateTask, onOpenBooking, onRecordBooking, onSetWaiting, onOpenTask,
   onResolve, onOpenConversation, onConfirmCustomerUpdate, onCloseCase,
 }: CaseJourneyProps) {
@@ -173,8 +172,7 @@ export function CaseJourneyView({
 
               {canManage && <section className="case-action-block">
                 <div className="case-action-heading"><div><span className="panel-kicker">WORKFLOW</span><h2>{serviceCase.status === 'Closed' ? 'Journey complete' : 'Next step'}</h2></div><span>{serviceCase.status}</span></div>
-                {serviceCase.status === 'Open' && <><p>Priya takes ownership of the service work for this Case.</p><button className="primary-button" onClick={onStartWork}><Wrench size={16} /> Start work</button></>}
-                {serviceCase.status === 'In progress' && !task && <><p>Create a Task for the technician. The Task will carry this Case ID.</p><div className="field"><label htmlFor="task-subject">Task</label><input id="task-subject" value={taskSubject} onChange={(event) => setTaskSubject(event.target.value)} /></div><div className="field-pair"><div className="field"><label htmlFor="task-assignee">Assignee</label><select id="task-assignee" value={taskAssigneeId} onChange={(event) => setTaskAssigneeId(event.target.value)}>{serviceUsers.filter((item) => item.role === 'Technician').map((item) => <option key={item.id} value={item.id}>{item.name} · Technician</option>)}</select></div><div className="field"><label htmlFor="task-due">Due time</label><input id="task-due" type="datetime-local" value={taskDueAt} onChange={(event) => setTaskDueAt(event.target.value)} /></div></div><button className="primary-button" onClick={createTask}><Plus size={16} /> Create Task</button></>}
+                {(serviceCase.status === 'Open' || serviceCase.status === 'In progress') && !task && <><p>Create a Task for the technician. The Task will carry this Case ID and move an Open Case to In progress.</p><div className="field"><label htmlFor="task-subject">Task</label><input id="task-subject" value={taskSubject} onChange={(event) => setTaskSubject(event.target.value)} /></div><div className="field-pair"><div className="field"><label htmlFor="task-assignee">Assignee</label><select id="task-assignee" value={taskAssigneeId} onChange={(event) => setTaskAssigneeId(event.target.value)}>{serviceUsers.filter((item) => item.role === 'Technician').map((item) => <option key={item.id} value={item.id}>{item.name} · Technician</option>)}</select></div><div className="field"><label htmlFor="task-due">Due time</label><input id="task-due" type="datetime-local" value={taskDueAt} onChange={(event) => setTaskDueAt(event.target.value)} /></div></div><button className="primary-button" onClick={createTask}><Plus size={16} /> Create Task</button></>}
                 {serviceCase.status === 'In progress' && task && !serviceCase.bookingReferenceId && <><p>Book the on-site visit in Services, then enter its ID here as a manual reference.</p><button className="secondary-button" onClick={onOpenBooking}><CalendarDays size={16} /> Open Services booking</button>{recentBookings.length > 0 && <p className="booking-hint">Booking saved in Services: {recentBookings.map((item) => item.id).join(', ')}. Enter the ID below to reference it on this Case.</p>}<div className="field manual-id-field"><label htmlFor="booking-reference">Services booking ID</label><input id="booking-reference" placeholder="For example, BOOK-501" value={bookingReference} onChange={(event) => setBookingReference(event.target.value)} /></div><button className="primary-button" onClick={recordBooking}>Record booking ID on Case</button></>}
                 {serviceCase.status === 'In progress' && serviceCase.bookingReferenceId && <><p>The visit is booked and its ID is recorded. Set the Case to Waiting while the appointment is pending.</p><div className="field"><label htmlFor="waiting-reason">Waiting reason</label><select id="waiting-reason" value={waitingReason} onChange={(event) => setWaitingReason(event.target.value)}><option value="">Choose a reason</option><option value="Waiting for appointment">Waiting for appointment</option><option value="Waiting for parts">Waiting for parts</option></select></div><button className="primary-button" onClick={saveWaiting}>Move to Waiting</button></>}
                 {serviceCase.status === 'Waiting' && task?.status === 'Open' && <><p>The appointment is pending. Open the technician Task to record completed work.</p><button className="primary-button" onClick={() => onOpenTask(task.id)}><Wrench size={16} /> Open technician Task</button></>}

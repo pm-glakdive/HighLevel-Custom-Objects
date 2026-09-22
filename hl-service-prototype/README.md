@@ -20,7 +20,7 @@ Open the local URL printed by Vite (normally `http://127.0.0.1:5173/`).
 4. Inspect SC-103, then return to the conversation.
 5. Choose **Create new Case**. Select `AC-002 · Conference-room AC`, `AMC-104`, an owner, and a priority.
 6. Choose **Create Case** to save `SC-104`, then inspect its linked records and applied 24-hour resolution target.
-7. **Start work** and create `TASK-201` for Sanjay Rao with a due time.
+7. On the Open Case, create `TASK-201` for Sanjay Rao with a due time. This moves the Case to **In progress**.
 8. Open **Services booking** and book an on-site visit. Copy its separate `BOOK-501` ID into the Case's manual booking reference field.
 9. Move SC-104 to **Waiting** with reason **Waiting for appointment**.
 10. Open Sanjay's Task, record the repair and cooling verification, and complete it.

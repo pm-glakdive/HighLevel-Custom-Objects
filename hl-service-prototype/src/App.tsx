@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft, ArrowRight, BadgeCheck, BriefcaseBusiness, ChevronRight,
   CircleHelp, Clock3, Inbox, Mail, MessageCircle, MessageSquareText, Send,
@@ -226,6 +226,7 @@ function App() {
   const [savedCaseId, setSavedCaseId] = useState<string | null>(initialDemoState.savedCaseId)
   const [casesModuleOpen, setCasesModuleOpen] = useState(Boolean(initialDemoState.savedCaseId))
   const [tasks, setTasks] = useState<ServiceTask[]>(initialDemoState.tasks)
+  const creatingTaskCaseIds = useRef<Set<string>>(new Set())
   const [bookings, setBookings] = useState<ServicesBooking[]>(initialDemoState.bookings)
   const [activities, setActivities] = useState<CaseActivity[]>(initialDemoState.activities)
   const [outboundMessages, setOutboundMessages] = useState<StoredMessage[]>(initialDemoState.outboundMessages)
@@ -355,17 +356,15 @@ function App() {
     setDraft(null)
   }
 
-  function startWork(caseId: string) {
-    if (savedCases.find((item) => item.id === caseId)?.status !== 'Open') return
-    updateSavedCase(caseId, { status: 'In progress' })
-    addActivity(caseId, 'user-priya', 'Started work on the Case.')
-  }
-
   function createTask(caseId: string, subject: string, assigneeId: string, dueAt: string) {
-    if (savedCases.find((item) => item.id === caseId)?.status !== 'In progress' || tasks.some((item) => item.caseId === caseId)) return
+    const serviceCase = savedCases.find((item) => item.id === caseId)
+    if (!serviceCase || (serviceCase.status !== 'Open' && serviceCase.status !== 'In progress') || tasks.some((item) => item.caseId === caseId) || creatingTaskCaseIds.current.has(caseId)) return
+    creatingTaskCaseIds.current.add(caseId)
     const task: ServiceTask = { id: nextRecordId('TASK', tasks, 201), caseId, subject, assigneeId, dueAt, status: 'Open', createdAt: new Date().toISOString() }
     setTasks((current) => [...current, task])
-    addActivity(caseId, 'user-priya', `Created ${task.id} for ${getOwnerName(assigneeId)}; due ${formatDateTime(dueAt)}.`)
+    if (serviceCase.status === 'Open') updateSavedCase(caseId, { status: 'In progress' })
+    const description = `Created ${task.id} for ${getOwnerName(assigneeId)}; due ${formatDateTime(dueAt)}.${serviceCase.status === 'Open' ? ' Moved Case to In progress.' : ''}`
+    addActivity(caseId, 'user-arun', description)
   }
 
   function createBooking(scheduledAt: string, location: string) {
@@ -465,6 +464,7 @@ function App() {
 
   function resetDemo() {
     clearDemoState()
+    creatingTaskCaseIds.current.clear()
     setLoggedIn(false)
     setCasesModuleOpen(false)
     setSelectedConversationId(null)
@@ -524,7 +524,7 @@ function App() {
             <div className="inbox-footer"><Inbox size={16} /> {filteredConversations.length} conversations</div>
           </aside>}
 
-          {draft && selectedContact ? <DraftView draft={draft} contact={selectedContact} onChange={setDraft} onBack={() => setDraft(null)} onCreate={createCase} /> : bookingCase && getAsset(bookingCase.assetId) ? <BookingView contact={getContact(bookingCase.contactId)} asset={getAsset(bookingCase.assetId)!} createdBooking={bookings.find((item) => item.id === createdBookingId) ?? null} onSave={createBooking} onBack={() => { setBookingViewCaseId(null); setCreatedBookingId(null) }} /> : technicianTask ? <TechnicianTaskView task={technicianTask} onComplete={(note) => completeTask(technicianTask.id, note)} onBack={() => setTechnicianTaskId(null)} /> : activeCase ? <CaseJourneyView key={activeCase.id} serviceCase={activeCase} allCases={allCases} tasks={tasks} bookings={bookings} activities={activities} customerUpdateSent={hasSentCustomerUpdate(activeCase)} canManage={savedCases.some((item) => item.id === activeCase.id)} onBack={returnToConversations} onStartWork={() => startWork(activeCase.id)} onCreateTask={(subject, assigneeId, dueAt) => createTask(activeCase.id, subject, assigneeId, dueAt)} onOpenBooking={() => { setBookingViewCaseId(activeCase.id); setCreatedBookingId(null) }} onRecordBooking={(id) => recordBookingReference(activeCase.id, id)} onSetWaiting={(reason) => moveToWaiting(activeCase.id, reason)} onOpenTask={setTechnicianTaskId} onResolve={(code, summary) => resolveCase(activeCase.id, code, summary)} onOpenConversation={() => openConversationForUpdate(activeCase.id)} onConfirmCustomerUpdate={() => confirmCustomerUpdate(activeCase.id)} onCloseCase={() => closeCase(activeCase.id)} /> : inCaseWorkspace ? <CasesModuleLanding caseCount={allCases.length} /> : <>
+          {draft && selectedContact ? <DraftView draft={draft} contact={selectedContact} onChange={setDraft} onBack={() => setDraft(null)} onCreate={createCase} /> : bookingCase && getAsset(bookingCase.assetId) ? <BookingView contact={getContact(bookingCase.contactId)} asset={getAsset(bookingCase.assetId)!} createdBooking={bookings.find((item) => item.id === createdBookingId) ?? null} onSave={createBooking} onBack={() => { setBookingViewCaseId(null); setCreatedBookingId(null) }} /> : technicianTask ? <TechnicianTaskView task={technicianTask} onComplete={(note) => completeTask(technicianTask.id, note)} onBack={() => setTechnicianTaskId(null)} /> : activeCase ? <CaseJourneyView key={activeCase.id} serviceCase={activeCase} allCases={allCases} tasks={tasks} bookings={bookings} activities={activities} customerUpdateSent={hasSentCustomerUpdate(activeCase)} canManage={savedCases.some((item) => item.id === activeCase.id)} onBack={returnToConversations} onCreateTask={(subject, assigneeId, dueAt) => createTask(activeCase.id, subject, assigneeId, dueAt)} onOpenBooking={() => { setBookingViewCaseId(activeCase.id); setCreatedBookingId(null) }} onRecordBooking={(id) => recordBookingReference(activeCase.id, id)} onSetWaiting={(reason) => moveToWaiting(activeCase.id, reason)} onOpenTask={setTechnicianTaskId} onResolve={(code, summary) => resolveCase(activeCase.id, code, summary)} onOpenConversation={() => openConversationForUpdate(activeCase.id)} onConfirmCustomerUpdate={() => confirmCustomerUpdate(activeCase.id)} onCloseCase={() => closeCase(activeCase.id)} /> : inCaseWorkspace ? <CasesModuleLanding caseCount={allCases.length} /> : <>
             <main className="conversation-pane" aria-label="Conversation">
               {selectedConversation && selectedContact ? <>
                 <div className="conversation-header"><div className="conversation-person"><Avatar contact={selectedContact} /><div><h2>{selectedContact.name}</h2><span><ChannelIcon channel={selectedConversation.channel} size={14} /> {selectedConversation.channel} conversation</span></div></div><button className="header-panel-button" onClick={() => setPanelOpen(!panelOpen)} aria-label={panelOpen ? 'Hide contact details' : 'Show contact details'}>{panelOpen ? <PanelRightClose size={19} /> : <PanelRightOpen size={19} />}<span>{panelOpen ? 'Hide details' : 'Show details'}</span></button></div>
