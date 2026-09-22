@@ -25,7 +25,7 @@ Open the local URL printed by Vite (normally `http://127.0.0.1:5173/`).
 9. Move SC-104 to **Waiting** with reason **Waiting for appointment**.
 10. Open Sanjay's Task, record the repair and cooling verification, and complete it.
 11. Resolve the Case with a code and summary. Open `AC-002` to see SC-104 in its service history.
-12. Open Ravi's conversation through his Contact, send a manual WhatsApp repair update mentioning SC-104, return through Ravi's Related Cases, and close SC-104.
+12. Open Ravi's conversation through his Contact and send a WhatsApp repair update mentioning SC-104. Return through Ravi's Related Cases, explicitly record that the customer was updated, then close SC-104.
 
 Related Cases are surfaced by Ravi's contact ID. The conversation has no selected Case, and the prototype does not represent native Conversation-to-Case binding in HighLevel. The saved Case stores record IDs for the requester, Asset, Agreement, and owner, plus a snapshot of the Agreement's resolution target at creation. The Task stores the Case ID. The Services booking is a separate record; its ID appears on the Case only after the agent enters it. Sending the customer message is also a manual action from Ravi's conversation.
 

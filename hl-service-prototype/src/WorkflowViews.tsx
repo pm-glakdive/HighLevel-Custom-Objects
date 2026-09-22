@@ -26,6 +26,7 @@ interface CaseJourneyProps {
   tasks: ServiceTask[]
   bookings: ServicesBooking[]
   activities: CaseActivity[]
+  customerUpdateSent: boolean
   onBack: () => void
   onStartWork: () => void
   onCreateTask: (subject: string, assigneeId: string, dueAt: string) => void
@@ -35,13 +36,14 @@ interface CaseJourneyProps {
   onOpenTask: (taskId: string) => void
   onResolve: (code: string, summary: string) => void
   onOpenConversation: () => void
+  onConfirmCustomerUpdate: () => void
   onCloseCase: () => void
 }
 
 export function CaseJourneyView({
-  serviceCase, allCases, tasks, bookings, activities, onBack, onStartWork,
+  serviceCase, allCases, tasks, bookings, activities, customerUpdateSent, onBack, onStartWork,
   onCreateTask, onOpenBooking, onRecordBooking, onSetWaiting, onOpenTask,
-  onResolve, onOpenConversation, onCloseCase,
+  onResolve, onOpenConversation, onConfirmCustomerUpdate, onCloseCase,
 }: CaseJourneyProps) {
   const [preview, setPreview] = useState<RecordPreview>(null)
   const [taskSubject, setTaskSubject] = useState('Inspect and repair conference-room AC')
@@ -51,6 +53,7 @@ export function CaseJourneyView({
   const [waitingReason, setWaitingReason] = useState('')
   const [resolutionCode, setResolutionCode] = useState('')
   const [resolutionSummary, setResolutionSummary] = useState('')
+  const [updateConfirmed, setUpdateConfirmed] = useState(false)
   const [formError, setFormError] = useState('')
 
   const contact = contacts.find((item) => item.id === serviceCase.contactId)
@@ -134,7 +137,7 @@ export function CaseJourneyView({
               <div className="detail-line"><span>Resolution code</span><strong>{serviceCase.resolutionCode}</strong></div>
               <p className="saved-description">{serviceCase.resolutionSummary}</p>
               <div className="detail-line"><span>Resolved</span><strong>{serviceCase.resolvedAt ? formatDateTime(serviceCase.resolvedAt) : '—'}</strong></div>
-              {serviceCase.customerUpdateAt && <div className="update-confirmation"><CheckCircle2 size={17} /><div><strong>Customer update sent to Ravi</strong><span>{formatDateTime(serviceCase.customerUpdateAt)} · Manual WhatsApp message</span><p>{serviceCase.customerUpdateText}</p></div></div>}
+              {serviceCase.customerUpdateAt && <div className="update-confirmation"><CheckCircle2 size={17} /><div><strong>Customer update confirmed</strong><span>{formatDateTime(serviceCase.customerUpdateAt)} · Manually recorded by Priya</span><p>{serviceCase.customerUpdateText}</p></div></div>}
               {serviceCase.closedAt && <div className="detail-line"><span>Closed</span><strong>{formatDateTime(serviceCase.closedAt)}</strong></div>}
             </section>}
 
@@ -146,8 +149,8 @@ export function CaseJourneyView({
               {serviceCase.status === 'In progress' && serviceCase.bookingReferenceId && <><p>The visit is booked and its ID is recorded. Set the Case to Waiting while the appointment is pending.</p><div className="field"><label htmlFor="waiting-reason">Waiting reason</label><select id="waiting-reason" value={waitingReason} onChange={(event) => setWaitingReason(event.target.value)}><option value="">Choose a reason</option><option value="Waiting for appointment">Waiting for appointment</option><option value="Waiting for parts">Waiting for parts</option></select></div><button className="primary-button" onClick={saveWaiting}>Move to Waiting</button></>}
               {serviceCase.status === 'Waiting' && task?.status === 'Open' && <><p>The appointment is pending. Open the technician Task to record completed work.</p><button className="primary-button" onClick={() => onOpenTask(task.id)}><Wrench size={16} /> Open technician Task</button></>}
               {serviceCase.status === 'Waiting' && task?.status === 'Completed' && <><p>The technician has completed the repair. Priya can now resolve the Case.</p><div className="field"><label htmlFor="resolution-code">Resolution code</label><select id="resolution-code" value={resolutionCode} onChange={(event) => setResolutionCode(event.target.value)}><option value="">Choose a code</option><option value="Repair completed">Repair completed</option><option value="No fault found">No fault found</option></select></div><div className="field"><label htmlFor="resolution-summary">Resolution summary</label><textarea id="resolution-summary" rows={4} value={resolutionSummary} onChange={(event) => setResolutionSummary(event.target.value)} placeholder="What was done and what was verified?" /></div><button className="primary-button" onClick={saveResolution}><CheckCircle2 size={16} /> Resolve Case</button></>}
-              {serviceCase.status === 'Resolved' && !serviceCase.customerUpdateAt && <><p>Open Ravi’s conversation through his Contact and send a manual update about the repair.</p><button className="primary-button" onClick={onOpenConversation}><MessageSquareText size={16} /> Open Ravi’s conversation</button></>}
-              {serviceCase.status === 'Resolved' && serviceCase.customerUpdateAt && <><p>Ravi has been updated. Close this Case to finish the journey.</p><button className="primary-button" onClick={onCloseCase}><CheckCircle2 size={16} /> Close Case</button></>}
+              {serviceCase.status === 'Resolved' && !serviceCase.customerUpdateAt && <><p>Open Ravi’s conversation through his Contact and send a manual update about the repair. Then return to this Case through Related Cases and record that you sent it.</p><button className="primary-button" onClick={onOpenConversation}><MessageSquareText size={16} /> Open Ravi’s conversation</button><div className="manual-update-confirmation"><label><input type="checkbox" checked={updateConfirmed} disabled={!customerUpdateSent} onChange={(event) => setUpdateConfirmed(event.target.checked)} /> I sent Ravi a repair update in Conversations.</label><button className="secondary-button" onClick={onConfirmCustomerUpdate} disabled={!customerUpdateSent || !updateConfirmed}>Record customer updated</button><span>{customerUpdateSent ? 'The WhatsApp message is sent. Record the confirmation separately on this Case.' : 'Send the WhatsApp update first. Sending does not update this Case automatically.'}</span></div></>}
+              {serviceCase.status === 'Resolved' && serviceCase.customerUpdateAt && <><p>The customer update confirmation is recorded. Close this Case to finish the journey.</p><button className="primary-button" onClick={onCloseCase}><CheckCircle2 size={16} /> Close Case</button></>}
               {serviceCase.status === 'Closed' && <p>The repair, customer update and closure are recorded on this Case.</p>}
               {formError && <span className="field-error" role="alert">{formError}</span>}
             </section>

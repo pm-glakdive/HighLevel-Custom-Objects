@@ -209,6 +209,7 @@ function App() {
   const [updateCaseId, setUpdateCaseId] = useState<string | null>(initialDemoState.updateCaseId)
   const [messageDraft, setMessageDraft] = useState(initialDemoState.updateCaseId ? `Hi Ravi, the conference-room AC has been repaired and cooling has been verified. Case ${initialDemoState.updateCaseId} is resolved.` : '')
   const [messageError, setMessageError] = useState('')
+  const [messageSentCaseId, setMessageSentCaseId] = useState<string | null>(null)
   const [bookingViewCaseId, setBookingViewCaseId] = useState<string | null>(null)
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null)
   const [technicianTaskId, setTechnicianTaskId] = useState<string | null>(null)
@@ -240,12 +241,23 @@ function App() {
     setSavedCases((current) => current.map((item) => item.id === caseId ? { ...item, ...changes } : item))
   }
 
+  function hasSentCustomerUpdate(serviceCase: ServiceCase): boolean {
+    const conversation = conversations.find((item) => item.contactId === serviceCase.contactId && item.channel === 'WhatsApp')
+    if (!serviceCase.resolvedAt || !conversation) return false
+    return outboundMessages.some((message) =>
+      message.conversationId === conversation.id && message.direction === 'outbound' && message.createdAt !== undefined &&
+      Date.parse(message.createdAt) >= Date.parse(serviceCase.resolvedAt!) &&
+      message.text.includes(serviceCase.id) && /repair/i.test(message.text),
+    )
+  }
+
   function selectConversation(id: string) {
     setSelectedConversationId(id)
     setInspectedCaseId(null)
     setDraft(null)
     setSavedCaseId(null)
     setUpdateCaseId(null)
+    setMessageSentCaseId(null)
     setBookingViewCaseId(null)
     setTechnicianTaskId(null)
     setPanelOpen(true)
@@ -363,6 +375,7 @@ function App() {
     setUpdateCaseId(caseId)
     setMessageDraft(`Hi Ravi, the conference-room AC has been repaired and cooling has been verified. Case ${caseId} is resolved.`)
     setMessageError('')
+    setMessageSentCaseId(null)
     setPanelOpen(true)
   }
 
@@ -377,11 +390,20 @@ function App() {
     const createdAt = new Date().toISOString()
     const message: StoredMessage = { id: crypto.randomUUID(), conversationId: selectedConversation.id, text, direction: 'outbound', createdAt, time: formatDateTime(createdAt) }
     setOutboundMessages((current) => [...current, message])
-    updateSavedCase(serviceCase.id, { customerUpdateAt: createdAt, customerUpdateText: text })
-    addActivity(serviceCase.id, 'user-priya', `Manually sent Ravi a WhatsApp update mentioning ${serviceCase.id} and the repair.`)
     setUpdateCaseId(null)
     setMessageDraft('')
     setMessageError('')
+    setMessageSentCaseId(serviceCase.id)
+  }
+
+  function confirmCustomerUpdate(caseId: string) {
+    const serviceCase = savedCases.find((item) => item.id === caseId)
+    if (!serviceCase || serviceCase.status !== 'Resolved' || serviceCase.customerUpdateAt || !hasSentCustomerUpdate(serviceCase)) return
+    updateSavedCase(caseId, {
+      customerUpdateAt: new Date().toISOString(),
+      customerUpdateText: 'Priya confirmed she sent Ravi a repair update in Conversations.',
+    })
+    addActivity(caseId, 'user-priya', 'Manually recorded that Ravi was sent a repair update in Conversations.')
   }
 
   function closeCase(caseId: string) {
@@ -404,6 +426,7 @@ function App() {
     setUpdateCaseId(null)
     setMessageDraft('')
     setMessageError('')
+    setMessageSentCaseId(null)
     setBookingViewCaseId(null)
     setCreatedBookingId(null)
     setTechnicianTaskId(null)
@@ -437,12 +460,12 @@ function App() {
             <div className="inbox-footer"><Inbox size={16} /> {filteredConversations.length} conversations</div>
           </aside>
 
-          {draft && selectedContact ? <DraftView draft={draft} contact={selectedContact} onChange={setDraft} onBack={() => setDraft(null)} onCreate={createCase} /> : bookingCase && getAsset(bookingCase.assetId) ? <BookingView contact={getContact(bookingCase.contactId)} asset={getAsset(bookingCase.assetId)!} createdBooking={bookings.find((item) => item.id === createdBookingId) ?? null} onSave={createBooking} onBack={() => { setBookingViewCaseId(null); setCreatedBookingId(null) }} /> : technicianTask ? <TechnicianTaskView task={technicianTask} onComplete={(note) => completeTask(technicianTask.id, note)} onBack={() => setTechnicianTaskId(null)} /> : openSavedCase ? <CaseJourneyView serviceCase={openSavedCase} allCases={allCases} tasks={tasks} bookings={bookings} activities={activities} onBack={() => { setSavedCaseId(null); setPanelOpen(true) }} onStartWork={() => startWork(openSavedCase.id)} onCreateTask={(subject, assigneeId, dueAt) => createTask(openSavedCase.id, subject, assigneeId, dueAt)} onOpenBooking={() => { setBookingViewCaseId(openSavedCase.id); setCreatedBookingId(null) }} onRecordBooking={(id) => recordBookingReference(openSavedCase.id, id)} onSetWaiting={(reason) => moveToWaiting(openSavedCase.id, reason)} onOpenTask={setTechnicianTaskId} onResolve={(code, summary) => resolveCase(openSavedCase.id, code, summary)} onOpenConversation={() => openConversationForUpdate(openSavedCase.id)} onCloseCase={() => closeCase(openSavedCase.id)} /> : <>
+          {draft && selectedContact ? <DraftView draft={draft} contact={selectedContact} onChange={setDraft} onBack={() => setDraft(null)} onCreate={createCase} /> : bookingCase && getAsset(bookingCase.assetId) ? <BookingView contact={getContact(bookingCase.contactId)} asset={getAsset(bookingCase.assetId)!} createdBooking={bookings.find((item) => item.id === createdBookingId) ?? null} onSave={createBooking} onBack={() => { setBookingViewCaseId(null); setCreatedBookingId(null) }} /> : technicianTask ? <TechnicianTaskView task={technicianTask} onComplete={(note) => completeTask(technicianTask.id, note)} onBack={() => setTechnicianTaskId(null)} /> : openSavedCase ? <CaseJourneyView serviceCase={openSavedCase} allCases={allCases} tasks={tasks} bookings={bookings} activities={activities} customerUpdateSent={hasSentCustomerUpdate(openSavedCase)} onBack={() => { setSavedCaseId(null); setPanelOpen(true) }} onStartWork={() => startWork(openSavedCase.id)} onCreateTask={(subject, assigneeId, dueAt) => createTask(openSavedCase.id, subject, assigneeId, dueAt)} onOpenBooking={() => { setBookingViewCaseId(openSavedCase.id); setCreatedBookingId(null) }} onRecordBooking={(id) => recordBookingReference(openSavedCase.id, id)} onSetWaiting={(reason) => moveToWaiting(openSavedCase.id, reason)} onOpenTask={setTechnicianTaskId} onResolve={(code, summary) => resolveCase(openSavedCase.id, code, summary)} onOpenConversation={() => openConversationForUpdate(openSavedCase.id)} onConfirmCustomerUpdate={() => confirmCustomerUpdate(openSavedCase.id)} onCloseCase={() => closeCase(openSavedCase.id)} /> : <>
             <main className="conversation-pane" aria-label="Conversation">
               {selectedConversation && selectedContact ? <>
                 <div className="conversation-header"><div className="conversation-person"><Avatar contact={selectedContact} /><div><h2>{selectedContact.name}</h2><span><ChannelIcon channel={selectedConversation.channel} size={14} /> {selectedConversation.channel} conversation</span></div></div><button className="header-panel-button" onClick={() => setPanelOpen(!panelOpen)} aria-label={panelOpen ? 'Hide contact details' : 'Show contact details'}>{panelOpen ? <PanelRightClose size={19} /> : <PanelRightOpen size={19} />}<span>{panelOpen ? 'Hide details' : 'Show details'}</span></button></div>
                 <div className="message-area"><div className="date-divider"><span>Today · 22 Sep 2026</span></div><div className="thread-channel"><ChannelIcon channel={selectedConversation.channel} size={15} /> {selectedConversation.channel}</div>{selectedMessages.map((message, index) => <div key={message.id} className={`message-row ${message.direction === 'outbound' ? 'message-row--outbound' : ''}`}>{message.direction === 'inbound' && <Avatar contact={selectedContact} />}<div className="message-body"><div className="message-bubble">{message.text}</div><span className="message-time">{message.time}{selectedConversation.unread && message.direction === 'inbound' && index === selectedConversation.messages.length - 1 && <span className="new-label">NEW</span>}</span></div>{message.direction === 'outbound' && <span className="avatar avatar--blue message-agent-avatar">PN</span>}</div>)}</div>
-                {updateCaseId ? <div className="conversation-composer"><div className="composer-heading"><strong>Manual WhatsApp update to Ravi</strong><span>Opened through Ravi’s Contact · no conversation-to-Case binding</span></div><label htmlFor="customer-update">Message</label><textarea id="customer-update" rows={3} value={messageDraft} onChange={(event) => setMessageDraft(event.target.value)} />{messageError && <span className="field-error" role="alert">{messageError}</span>}<div className="composer-actions"><span>Sending also records customer-update confirmation on {updateCaseId}.</span><button className="primary-button" onClick={sendCustomerUpdate}><Send size={15} /> Send WhatsApp update</button></div></div> : <div className="conversation-bottom"><div className="conversation-bottom-icon"><MessageSquareText size={19} /></div><div><strong>Turn this request into service work</strong><span>Review related Cases in the contact panel before choosing the next step.</span></div></div>}
+                {updateCaseId ? <div className="conversation-composer"><div className="composer-heading"><strong>Manual WhatsApp update to Ravi</strong><span>Opened through Ravi’s Contact · no conversation-to-Case binding</span></div><label htmlFor="customer-update">Message</label><textarea id="customer-update" rows={3} value={messageDraft} onChange={(event) => setMessageDraft(event.target.value)} />{messageError && <span className="field-error" role="alert">{messageError}</span>}<div className="composer-actions"><span>Sending adds this message to Ravi’s conversation only. Confirm the update separately on {updateCaseId}.</span><button className="primary-button" onClick={sendCustomerUpdate}><Send size={15} /> Send WhatsApp update</button></div></div> : <div className="conversation-bottom"><div className="conversation-bottom-icon"><MessageSquareText size={19} /></div><div><strong>{messageSentCaseId ? 'Message sent to Ravi' : 'Turn this request into service work'}</strong><span>{messageSentCaseId ? `Open ${messageSentCaseId} in Related Cases and record customer-update confirmation.` : 'Review related Cases in the contact panel before choosing the next step.'}</span></div></div>}
               </> : <div className="select-empty"><div className="select-empty-icon"><MessageSquareText size={30} /></div><h2>Select a conversation</h2><p>Open Ravi’s new WhatsApp message to review the customer and related Cases.</p></div>}
             </main>
             {selectedConversation && selectedContact && panelOpen && (inspectedCase ? <CaseInspection serviceCase={inspectedCase} onBack={() => setInspectedCaseId(null)} /> : <ContactPanel contact={selectedContact} relatedCases={allCases.filter((item) => item.contactId === selectedContact.id)} onInspectCase={openCase} onCreateCase={startDraft} onClose={() => setPanelOpen(false)} />)}
