@@ -85,22 +85,25 @@ function Login({ onContinue }: { onContinue: () => void }) {
   )
 }
 
-function CaseSummary({ serviceCase, onOpen }: { serviceCase: ServiceCase; onOpen: () => void }) {
+function CaseSummary({ serviceCase, onInspect, onViewInCases }: { serviceCase: ServiceCase; onInspect: () => void; onViewInCases: () => void }) {
   const asset = getAsset(serviceCase.assetId)
   return (
-    <button className="case-summary" onClick={onOpen} aria-label={`Inspect ${serviceCase.id}, ${serviceCase.subject}`}>
-      <span className="case-summary-top"><strong>{serviceCase.id}</strong><span className="status-pill"><span />{serviceCase.status}</span></span>
-      <span className="case-title">{serviceCase.subject}</span>
-      <span className="case-subline">{asset?.location ?? 'Asset not selected'} <span>·</span> Opened {formatDate(serviceCase.createdAt)}</span>
-      <span className="case-open-link">Inspect Case <ChevronRight size={15} /></span>
-    </button>
+    <div className="case-summary">
+      <button className="case-summary-inspect" onClick={onInspect} aria-label={`Inspect ${serviceCase.id}, ${serviceCase.subject}`}>
+        <span className="case-summary-top"><strong>{serviceCase.id}</strong><span className="status-pill"><span />{serviceCase.status}</span></span>
+        <span className="case-title">{serviceCase.subject}</span>
+        <span className="case-subline">{asset?.location ?? 'Asset not selected'} <span>·</span> Opened {formatDate(serviceCase.createdAt)}</span>
+      </button>
+      <div className="case-summary-actions"><button onClick={onInspect}>Inspect Case <ChevronRight size={15} /></button><button onClick={onViewInCases}>View in Cases <ArrowRight size={14} /></button></div>
+    </div>
   )
 }
 
-function ContactPanel({ contact, relatedCases, onInspectCase, onCreateCase, onClose }: {
+function ContactPanel({ contact, relatedCases, onInspectCase, onViewInCases, onCreateCase, onClose }: {
   contact: Contact
   relatedCases: ServiceCase[]
   onInspectCase: (id: string) => void
+  onViewInCases: (id: string) => void
   onCreateCase: () => void
   onClose: () => void
 }) {
@@ -118,7 +121,7 @@ function ContactPanel({ contact, relatedCases, onInspectCase, onCreateCase, onCl
         <section className="related-section">
           <div className="section-heading"><div><span className="panel-kicker">SERVICE CONTEXT</span><h3>Related Cases <span className="count-badge">{relatedCases.length}</span></h3></div></div>
           <p className="helper-copy">Cases for this contact are candidates. Check the issue before choosing one for this message.</p>
-          {relatedCases.length > 0 ? relatedCases.map((item) => <CaseSummary key={item.id} serviceCase={item} onOpen={() => onInspectCase(item.id)} />) : <p className="empty-cases">No existing Cases for this contact.</p>}
+          {relatedCases.length > 0 ? relatedCases.map((item) => <CaseSummary key={item.id} serviceCase={item} onInspect={() => onInspectCase(item.id)} onViewInCases={() => onViewInCases(item.id)} />) : <p className="empty-cases">No existing Cases for this contact.</p>}
         </section>
 
         {contact.id === 'contact-ravi' && <section className="decision-card">
@@ -132,7 +135,7 @@ function ContactPanel({ contact, relatedCases, onInspectCase, onCreateCase, onCl
   )
 }
 
-function CaseInspection({ serviceCase, onBack }: { serviceCase: ServiceCase; onBack: () => void }) {
+function CaseInspection({ serviceCase, onBack, onViewInCases }: { serviceCase: ServiceCase; onBack: () => void; onViewInCases: () => void }) {
   const asset = getAsset(serviceCase.assetId)
   return (
     <aside className="detail-panel" aria-label={`${serviceCase.id} Case details`}>
@@ -142,10 +145,29 @@ function CaseInspection({ serviceCase, onBack }: { serviceCase: ServiceCase; onB
         <div className="inspection-note"><CircleHelp size={19} /><span>This Case is related to Ravi’s contact. Decide whether the new message is about this same issue.</span></div>
         <div className="inspection-section"><span className="panel-kicker">ISSUE DETAILS</span><p>{serviceCase.description}</p></div>
         <dl className="case-facts"><div><dt>Location</dt><dd>{asset?.location ?? 'Not selected'}</dd></div><div><dt>Asset</dt><dd>{asset ? `${asset.id} · ${asset.name}` : 'Not selected'}</dd></div><div><dt>Priority</dt><dd>{serviceCase.priority}</dd></div><div><dt>Owner</dt><dd>{getOwnerName(serviceCase.ownerId)}</dd></div><div><dt>Opened</dt><dd>{formatDate(serviceCase.createdAt)}</dd></div></dl>
-        <div className="inspection-footer"><p>Ravi’s new message mentions the <strong>conference-room AC</strong>. This Case is about the <strong>lobby AC</strong>.</p><button className="secondary-button full-width" onClick={onBack}><ArrowLeft size={17} /> Return to conversation</button></div>
+        <div className="inspection-footer"><p>{serviceCase.id === 'SC-103' ? <>Ravi’s new message mentions the <strong>conference-room AC</strong>. This Case is about the <strong>lobby AC</strong>.</> : 'Review this Case in the Service Cases module for its full record and activity.'}</p><button className="primary-button full-width" onClick={onViewInCases}><BriefcaseBusiness size={16} /> View in Cases</button><button className="secondary-button full-width" onClick={onBack}><ArrowLeft size={17} /> Return to conversation</button></div>
       </div>
     </aside>
   )
+}
+
+function CasesModuleSidebar({ cases, activeCaseId, onSelect, onBack }: { cases: ServiceCase[]; activeCaseId: string | null; onSelect: (id: string) => void; onBack: () => void }) {
+  return <aside className="cases-module-sidebar" aria-label="Service Cases records">
+    <div className="cases-module-heading"><span className="eyebrow">CUSTOM MODULE</span><h2>Service Cases</h2><p>Records</p></div>
+    <div className="cases-module-list">{cases.map((item) => <button key={item.id} className={item.id === activeCaseId ? 'active' : ''} onClick={() => onSelect(item.id)} aria-current={item.id === activeCaseId ? 'page' : undefined}><strong>{item.id}</strong><span>{item.subject}</span><small>{item.status}</small></button>)}</div>
+    <button className="cases-module-back" onClick={onBack}><ArrowLeft size={16} /> Back to Conversations</button>
+  </aside>
+}
+
+function CasesModuleLanding({ caseCount }: { caseCount: number }) {
+  return <main className="draft-view cases-module-landing" aria-labelledby="cases-landing-title">
+    <div className="cases-landing-content">
+      <span className="cases-landing-icon"><BriefcaseBusiness size={26} /></span>
+      <span className="panel-kicker">SERVICE CASES · CUSTOM MODULE</span>
+      <h1 id="cases-landing-title">Select a Service Case</h1>
+      <p>{caseCount} records in the list. Choose one to review its fields, related records, work, and activity.</p>
+    </div>
+  </main>
 }
 
 function DraftView({ draft, contact, onChange, onBack, onCreate }: {
@@ -202,6 +224,7 @@ function App() {
   const [draft, setDraft] = useState<CaseDraft | null>(null)
   const [savedCases, setSavedCases] = useState<ServiceCase[]>(initialDemoState.savedCases)
   const [savedCaseId, setSavedCaseId] = useState<string | null>(initialDemoState.savedCaseId)
+  const [casesModuleOpen, setCasesModuleOpen] = useState(Boolean(initialDemoState.savedCaseId))
   const [tasks, setTasks] = useState<ServiceTask[]>(initialDemoState.tasks)
   const [bookings, setBookings] = useState<ServicesBooking[]>(initialDemoState.bookings)
   const [activities, setActivities] = useState<CaseActivity[]>(initialDemoState.activities)
@@ -222,9 +245,12 @@ function App() {
   const selectedConversation = conversations.find((item) => item.id === selectedConversationId) ?? null
   const selectedContact = selectedConversation ? getContact(selectedConversation.contactId) : null
   const inspectedCase = allCases.find((item) => item.id === inspectedCaseId) ?? null
-  const openSavedCase = savedCases.find((item) => item.id === savedCaseId) ?? null
+  const activeCase = allCases.find((item) => item.id === savedCaseId) ?? null
   const bookingCase = savedCases.find((item) => item.id === bookingViewCaseId) ?? null
   const technicianTask = tasks.find((item) => item.id === technicianTaskId) ?? null
+  const inCaseWorkspace = casesModuleOpen || Boolean(activeCase || bookingCase || technicianTask)
+  const activePersona = technicianTask ? serviceUsers.find((item) => item.id === 'user-sanjay') : serviceUsers.find((item) => item.id === (inCaseWorkspace ? 'user-arun' : 'user-priya'))
+  const personaInitials = technicianTask ? 'SR' : inCaseWorkspace ? 'AM' : 'PN'
   const selectedMessages: Message[] = selectedConversation ? [...selectedConversation.messages, ...outboundMessages.filter((item) => item.conversationId === selectedConversation.id)] : []
   const filteredConversations = useMemo(() => conversations.filter((conversation) => {
     if (inboxTab === 'Unread' && !conversation.unread) return false
@@ -252,6 +278,7 @@ function App() {
   }
 
   function selectConversation(id: string) {
+    setCasesModuleOpen(false)
     setSelectedConversationId(id)
     setInspectedCaseId(null)
     setDraft(null)
@@ -270,14 +297,36 @@ function App() {
     setSavedCaseId(null)
   }
 
-  function openCase(id: string) {
-    if (savedCases.some((item) => item.id === id)) {
-      setSavedCaseId(id)
-      setInspectedCaseId(null)
-      setUpdateCaseId(null)
-    } else {
-      setInspectedCaseId(id)
-    }
+  function viewInCases(id: string) {
+    if (!allCases.some((item) => item.id === id)) return
+    setCasesModuleOpen(true)
+    setSavedCaseId(id)
+    setInspectedCaseId(null)
+    setDraft(null)
+    setUpdateCaseId(null)
+    setBookingViewCaseId(null)
+    setCreatedBookingId(null)
+    setTechnicianTaskId(null)
+  }
+
+  function openServiceCases() {
+    setCasesModuleOpen(true)
+    setSavedCaseId(null)
+    setDraft(null)
+    setInspectedCaseId(null)
+    setBookingViewCaseId(null)
+    setCreatedBookingId(null)
+    setTechnicianTaskId(null)
+  }
+
+  function returnToConversations() {
+    setCasesModuleOpen(false)
+    setSavedCaseId(null)
+    setBookingViewCaseId(null)
+    setCreatedBookingId(null)
+    setTechnicianTaskId(null)
+    setPanelOpen(true)
+    if (!selectedConversationId) setSelectedConversationId('conversation-ravi')
   }
 
   function createCase() {
@@ -370,6 +419,7 @@ function App() {
     const serviceCase = savedCases.find((item) => item.id === caseId)
     const conversation = conversations.find((item) => item.contactId === serviceCase?.contactId)
     if (!serviceCase || serviceCase.status !== 'Resolved' || !conversation) return
+    setCasesModuleOpen(false)
     setSelectedConversationId(conversation.id)
     setSavedCaseId(null)
     setUpdateCaseId(caseId)
@@ -416,6 +466,7 @@ function App() {
   function resetDemo() {
     clearDemoState()
     setLoggedIn(false)
+    setCasesModuleOpen(false)
     setSelectedConversationId(null)
     setSavedCaseId(null)
     setSavedCases([])
@@ -441,11 +492,24 @@ function App() {
 
   return (
     <div className="app-shell">
-      <aside className="app-rail" aria-label="Workspace navigation"><div className="rail-brand" aria-label="HighLevel"><span>H<span>↑</span></span></div><div className="rail-divider" /><div className="rail-active" title="Conversations"><MessageSquareText size={21} /></div><div className="rail-spacer" /><div className="rail-avatar" title={technicianTask ? 'Sanjay Rao · Technician (demo role)' : 'Priya Nair · Service Agent'}>{technicianTask ? 'SR' : 'PN'}</div></aside>
+      <aside className="app-rail" aria-label="Workspace navigation">
+        <div className="rail-brand" aria-label="HighLevel"><span>H<span>↑</span></span></div>
+        <div className="rail-divider" />
+        <nav className="rail-nav" aria-label="Primary navigation">
+          <button type="button" className={inCaseWorkspace ? 'rail-nav-button' : 'rail-nav-button active'} aria-label="Conversations" aria-current={!inCaseWorkspace ? 'page' : undefined} onClick={returnToConversations}><MessageSquareText size={21} /><span>Conversations</span></button>
+          <button type="button" className={inCaseWorkspace ? 'rail-nav-button active' : 'rail-nav-button'} aria-label="Service Cases" aria-current={inCaseWorkspace ? 'page' : undefined} onClick={openServiceCases}><BriefcaseBusiness size={21} /><span>Service Cases</span></button>
+        </nav>
+        <div className="rail-spacer" />
+        <div className="rail-avatar" title={activePersona ? activePersona.name + ' · ' + activePersona.role + ' (demo role)' : 'Demo role'}>{personaInitials}</div>
+      </aside>
       <div className="workspace">
-        <header className="topbar"><div className="topbar-title"><span className="topbar-product">{bookingViewCaseId ? 'Services' : technicianTaskId ? 'Tasks' : openSavedCase ? 'Service Cases' : 'Conversations'}</span><span className="topbar-divider" /><span className="topbar-location">{bookingViewCaseId ? 'On-site visit' : technicianTaskId ? 'Technician work' : openSavedCase ? 'Case detail' : 'Team inbox'}</span></div><div className="topbar-right"><span className="workspace-label"><span className="workspace-dot" /> Northstar Service</span><button className="reset-demo" onClick={resetDemo}><RotateCcw size={13} /> Reset demo</button><span className="agent-badge" title={technicianTask ? 'Sanjay Rao · Technician (demo role)' : 'Priya Nair · Service Agent'}>{technicianTask ? 'SR' : 'PN'}</span></div></header>
+        <header className="topbar">
+          <div className="topbar-title"><span className="topbar-product">{bookingViewCaseId ? 'Services' : technicianTaskId ? 'Tasks' : inCaseWorkspace ? 'Service Cases' : 'Conversations'}</span><span className="topbar-divider" /><span className="topbar-location">{bookingViewCaseId ? 'On-site visit' : technicianTaskId ? 'Technician work' : activeCase ? 'Case record' : inCaseWorkspace ? 'Records' : 'Team inbox'}</span></div>
+          {inCaseWorkspace && <nav className="module-switch" aria-label="Module navigation"><button onClick={returnToConversations}>Conversations</button><ChevronRight size={14} /><strong aria-current="page">Service Cases</strong></nav>}
+          <div className="topbar-right"><span className="workspace-label"><span className="workspace-dot" /> Northstar Service</span><button className="reset-demo" onClick={resetDemo}><RotateCcw size={13} /> Reset demo</button><span className="persona-label">Viewing as <strong>{activePersona?.name ?? 'Team member'} · {activePersona?.role ?? 'Demo role'}</strong></span><span className="agent-badge" title={activePersona ? activePersona.name + ' · ' + activePersona.role + ' (demo role)' : 'Demo role'}>{personaInitials}</span></div>
+        </header>
         <div className="workspace-body">
-          <aside className="inbox-panel" aria-label="Conversations inbox">
+          {inCaseWorkspace ? <CasesModuleSidebar cases={allCases} activeCaseId={savedCaseId} onSelect={viewInCases} onBack={returnToConversations} /> : <aside className="inbox-panel" aria-label="Conversations inbox">
             <div className="inbox-heading"><div><span className="eyebrow">INBOX</span><h1>Team inbox</h1></div><span className="inbox-total">{conversations.length}</span></div>
             <div className="inbox-tabs" role="tablist" aria-label="Conversation filter"><button role="tab" aria-selected={inboxTab === 'All'} className={inboxTab === 'All' ? 'active' : ''} onClick={() => setInboxTab('All')}>All</button><button role="tab" aria-selected={inboxTab === 'Unread'} className={inboxTab === 'Unread' ? 'active' : ''} onClick={() => setInboxTab('Unread')}>Unread <span>{conversations.filter((item) => item.unread).length}</span></button></div>
             <label className="search-box"><Search size={17} /><input aria-label="Search conversations" placeholder="Search conversations" value={search} onChange={(event) => setSearch(event.target.value)} />{search && <button onClick={() => setSearch('')} aria-label="Clear search"><X size={15} /></button>}</label>
@@ -458,9 +522,9 @@ function App() {
               </button>
             }) : <div className="empty-list">No conversations found.</div>}</div>
             <div className="inbox-footer"><Inbox size={16} /> {filteredConversations.length} conversations</div>
-          </aside>
+          </aside>}
 
-          {draft && selectedContact ? <DraftView draft={draft} contact={selectedContact} onChange={setDraft} onBack={() => setDraft(null)} onCreate={createCase} /> : bookingCase && getAsset(bookingCase.assetId) ? <BookingView contact={getContact(bookingCase.contactId)} asset={getAsset(bookingCase.assetId)!} createdBooking={bookings.find((item) => item.id === createdBookingId) ?? null} onSave={createBooking} onBack={() => { setBookingViewCaseId(null); setCreatedBookingId(null) }} /> : technicianTask ? <TechnicianTaskView task={technicianTask} onComplete={(note) => completeTask(technicianTask.id, note)} onBack={() => setTechnicianTaskId(null)} /> : openSavedCase ? <CaseJourneyView serviceCase={openSavedCase} allCases={allCases} tasks={tasks} bookings={bookings} activities={activities} customerUpdateSent={hasSentCustomerUpdate(openSavedCase)} onBack={() => { setSavedCaseId(null); setPanelOpen(true) }} onStartWork={() => startWork(openSavedCase.id)} onCreateTask={(subject, assigneeId, dueAt) => createTask(openSavedCase.id, subject, assigneeId, dueAt)} onOpenBooking={() => { setBookingViewCaseId(openSavedCase.id); setCreatedBookingId(null) }} onRecordBooking={(id) => recordBookingReference(openSavedCase.id, id)} onSetWaiting={(reason) => moveToWaiting(openSavedCase.id, reason)} onOpenTask={setTechnicianTaskId} onResolve={(code, summary) => resolveCase(openSavedCase.id, code, summary)} onOpenConversation={() => openConversationForUpdate(openSavedCase.id)} onConfirmCustomerUpdate={() => confirmCustomerUpdate(openSavedCase.id)} onCloseCase={() => closeCase(openSavedCase.id)} /> : <>
+          {draft && selectedContact ? <DraftView draft={draft} contact={selectedContact} onChange={setDraft} onBack={() => setDraft(null)} onCreate={createCase} /> : bookingCase && getAsset(bookingCase.assetId) ? <BookingView contact={getContact(bookingCase.contactId)} asset={getAsset(bookingCase.assetId)!} createdBooking={bookings.find((item) => item.id === createdBookingId) ?? null} onSave={createBooking} onBack={() => { setBookingViewCaseId(null); setCreatedBookingId(null) }} /> : technicianTask ? <TechnicianTaskView task={technicianTask} onComplete={(note) => completeTask(technicianTask.id, note)} onBack={() => setTechnicianTaskId(null)} /> : activeCase ? <CaseJourneyView key={activeCase.id} serviceCase={activeCase} allCases={allCases} tasks={tasks} bookings={bookings} activities={activities} customerUpdateSent={hasSentCustomerUpdate(activeCase)} canManage={savedCases.some((item) => item.id === activeCase.id)} onBack={returnToConversations} onStartWork={() => startWork(activeCase.id)} onCreateTask={(subject, assigneeId, dueAt) => createTask(activeCase.id, subject, assigneeId, dueAt)} onOpenBooking={() => { setBookingViewCaseId(activeCase.id); setCreatedBookingId(null) }} onRecordBooking={(id) => recordBookingReference(activeCase.id, id)} onSetWaiting={(reason) => moveToWaiting(activeCase.id, reason)} onOpenTask={setTechnicianTaskId} onResolve={(code, summary) => resolveCase(activeCase.id, code, summary)} onOpenConversation={() => openConversationForUpdate(activeCase.id)} onConfirmCustomerUpdate={() => confirmCustomerUpdate(activeCase.id)} onCloseCase={() => closeCase(activeCase.id)} /> : inCaseWorkspace ? <CasesModuleLanding caseCount={allCases.length} /> : <>
             <main className="conversation-pane" aria-label="Conversation">
               {selectedConversation && selectedContact ? <>
                 <div className="conversation-header"><div className="conversation-person"><Avatar contact={selectedContact} /><div><h2>{selectedContact.name}</h2><span><ChannelIcon channel={selectedConversation.channel} size={14} /> {selectedConversation.channel} conversation</span></div></div><button className="header-panel-button" onClick={() => setPanelOpen(!panelOpen)} aria-label={panelOpen ? 'Hide contact details' : 'Show contact details'}>{panelOpen ? <PanelRightClose size={19} /> : <PanelRightOpen size={19} />}<span>{panelOpen ? 'Hide details' : 'Show details'}</span></button></div>
@@ -468,7 +532,7 @@ function App() {
                 {updateCaseId ? <div className="conversation-composer"><div className="composer-heading"><strong>Manual WhatsApp update to Ravi</strong><span>Opened through Ravi’s Contact · no conversation-to-Case binding</span></div><label htmlFor="customer-update">Message</label><textarea id="customer-update" rows={3} value={messageDraft} onChange={(event) => setMessageDraft(event.target.value)} />{messageError && <span className="field-error" role="alert">{messageError}</span>}<div className="composer-actions"><span>Sending adds this message to Ravi’s conversation only. Confirm the update separately on {updateCaseId}.</span><button className="primary-button" onClick={sendCustomerUpdate}><Send size={15} /> Send WhatsApp update</button></div></div> : <div className="conversation-bottom"><div className="conversation-bottom-icon"><MessageSquareText size={19} /></div><div><strong>{messageSentCaseId ? 'Message sent to Ravi' : 'Turn this request into service work'}</strong><span>{messageSentCaseId ? `Open ${messageSentCaseId} in Related Cases and record customer-update confirmation.` : 'Review related Cases in the contact panel before choosing the next step.'}</span></div></div>}
               </> : <div className="select-empty"><div className="select-empty-icon"><MessageSquareText size={30} /></div><h2>Select a conversation</h2><p>Open Ravi’s new WhatsApp message to review the customer and related Cases.</p></div>}
             </main>
-            {selectedConversation && selectedContact && panelOpen && (inspectedCase ? <CaseInspection serviceCase={inspectedCase} onBack={() => setInspectedCaseId(null)} /> : <ContactPanel contact={selectedContact} relatedCases={allCases.filter((item) => item.contactId === selectedContact.id)} onInspectCase={openCase} onCreateCase={startDraft} onClose={() => setPanelOpen(false)} />)}
+            {selectedConversation && selectedContact && panelOpen && (inspectedCase ? <CaseInspection serviceCase={inspectedCase} onBack={() => setInspectedCaseId(null)} onViewInCases={() => viewInCases(inspectedCase.id)} /> : <ContactPanel contact={selectedContact} relatedCases={allCases.filter((item) => item.contactId === selectedContact.id)} onInspectCase={setInspectedCaseId} onViewInCases={viewInCases} onCreateCase={startDraft} onClose={() => setPanelOpen(false)} />)}
           </>}
         </div>
       </div>

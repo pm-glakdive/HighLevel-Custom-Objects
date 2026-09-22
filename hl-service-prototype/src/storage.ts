@@ -1,4 +1,4 @@
-import type { CaseActivity, ServiceCase, ServiceTask, ServicesBooking, StoredMessage } from './data'
+import { serviceCases, type CaseActivity, type ServiceCase, type ServiceTask, type ServicesBooking, type StoredMessage } from './data'
 
 const STORAGE_KEY = 'hl-service-prototype-demo-v3'
 const PREVIOUS_STORAGE_KEY = 'hl-service-prototype-demo-v2'
@@ -43,7 +43,7 @@ export function loadDemoState(): DemoState {
     return {
       loggedIn: state.loggedIn === true,
       selectedConversationId: typeof state.selectedConversationId === 'string' ? state.selectedConversationId : null,
-      savedCaseId: typeof state.savedCaseId === 'string' && savedCases.some((item) => item.id === state.savedCaseId) ? state.savedCaseId : null,
+      savedCaseId: typeof state.savedCaseId === 'string' && [...savedCases, ...serviceCases].some((item) => item.id === state.savedCaseId) ? state.savedCaseId : null,
       savedCases,
       tasks: validRecords<ServiceTask>(state.tasks, ['id', 'caseId', 'assigneeId', 'dueAt', 'status']),
       bookings: validRecords<ServicesBooking>(state.bookings, ['id', 'contactId', 'assetId', 'scheduledAt']),
