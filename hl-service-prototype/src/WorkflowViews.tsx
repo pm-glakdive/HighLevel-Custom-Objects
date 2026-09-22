@@ -17,7 +17,7 @@ function localDateTimeInput(date: Date): string {
   return local.toISOString().slice(0, 16)
 }
 
-type RecordPreview = 'contact' | 'asset' | 'agreement' | null
+type RecordPreview = 'asset' | 'agreement' | null
 
 interface CaseJourneyProps {
   serviceCase: ServiceCase
@@ -26,6 +26,9 @@ interface CaseJourneyProps {
   activities: CaseActivity[]
   customerUpdateSent: boolean
   canManage: boolean
+  linkedConversation: { id: string; channel: string } | null
+  onViewLinkedConversation: () => void
+  onViewContact: () => void
   onBack: () => void
   onCreateTask: (subject: string, assigneeId: string, dueAt: string) => void
   onOpenTask: (taskId: string) => void
@@ -36,7 +39,7 @@ interface CaseJourneyProps {
 }
 
 export function CaseJourneyView({
-  serviceCase, allCases, tasks, activities, customerUpdateSent, canManage, onBack,
+  serviceCase, allCases, tasks, activities, customerUpdateSent, canManage, linkedConversation, onViewLinkedConversation, onViewContact, onBack,
   onCreateTask, onOpenTask,
   onResolve, onOpenConversation, onConfirmCustomerUpdate, onCloseCase,
 }: CaseJourneyProps) {
@@ -115,7 +118,8 @@ export function CaseJourneyView({
               <div><dt>Owner</dt><dd>{owner?.name ?? 'Unassigned'}</dd></div>
               <div><dt>Priority</dt><dd>{serviceCase.priority}</dd></div>
               <div><dt>Created</dt><dd>{formatDateTime(serviceCase.createdAt)}</dd></div>
-              <div><dt>Source</dt><dd>{serviceCase.source}<small>Source only; no Case chat binding</small></dd></div>
+              <div><dt>Source</dt><dd>{serviceCase.source}</dd></div>
+              <div><dt>Conversation</dt><dd>{linkedConversation ? <button type="button" className="case-conversation-link" onClick={onViewLinkedConversation}>Active in {contact.name}’s {linkedConversation.channel} chat <ChevronRight size={13} /></button> : <small>No active conversation selected for this Case</small>}</dd></div>
               {serviceCase.waitingReason && <div><dt>Waiting reason</dt><dd>{serviceCase.waitingReason}</dd></div>}
             </dl>
             <div className="case-inspector-target">
@@ -162,14 +166,15 @@ export function CaseJourneyView({
                 {serviceCase.closedAt && <div className="detail-line"><span>Closed</span><strong>{formatDateTime(serviceCase.closedAt)}</strong></div>}
               </section>}
 
-              <div className="case-relations-title"><h2>Related records &amp; work</h2><span>Case-linked context, not a contact conversation</span></div>
+              <div className="case-relations-title"><h2>Related records &amp; work</h2><span>Records and work linked to this Case</span></div>
               <div className="case-relations-grid">
                 <section className="case-related-section" aria-label="Linked records">
                   <h3>Linked records</h3>
-                  <a href="#case-record-preview" className="case-related-row" onClick={(event) => { event.preventDefault(); setPreview('contact') }}><span>Requester · Contact</span><strong>{contact.name} <ChevronRight size={15} /></strong></a>
+                  <button type="button" className="case-related-row case-related-button" onClick={onViewContact}><span>Requester · Contact</span><strong>{contact.name} <ChevronRight size={15} /></strong></button>
+                  {linkedConversation && <button type="button" className="case-related-row case-related-button" onClick={onViewLinkedConversation}><span>Active conversation</span><strong>{contact.name} · {linkedConversation.channel} <ChevronRight size={15} /></strong></button>}
                   {asset && <a href="#case-record-preview" className="case-related-row" onClick={(event) => { event.preventDefault(); setPreview('asset') }}><span>Customer Asset</span><strong>{asset.id} · {asset.name} <ChevronRight size={15} /></strong></a>}
                   {agreement ? <a href="#case-record-preview" className="case-related-row" onClick={(event) => { event.preventDefault(); setPreview('agreement') }}><span>Service Agreement</span><strong>{agreement.id} · {agreement.name} <ChevronRight size={15} /></strong></a> : <div className="case-related-row"><span>Service Agreement</span><strong>None linked</strong></div>}
-                  {preview && <div className="record-preview case-related-preview" id="case-record-preview" aria-label="Linked record details"><div className="record-preview-heading"><span className="panel-kicker">LINKED RECORD</span><button className="icon-button" onClick={() => setPreview(null)} aria-label="Close linked record details"><X size={16} /></button></div>{preview === 'contact' && <><h3>{contact.name}</h3><p>Contact · {contact.role}</p><div>{contact.company}</div><div>{contact.phone}</div><div>{contact.email}</div></>}{preview === 'asset' && asset && <><h3>{asset.id} · {asset.name}</h3><p>Customer Asset · {asset.status}</p><div>{asset.location}</div><div>{asset.type}</div><div>{asset.company}</div><div className="asset-history"><strong>Service history</strong>{history.length ? history.map((item) => <div key={item.id}>{item.id} · {item.subject} <span>{item.status}</span></div>) : <p>No completed Cases yet.</p>}</div></>}{preview === 'agreement' && agreement && <><h3>{agreement.id} · {agreement.name}</h3><p>Service Agreement · {agreement.status}</p><div>{agreement.coverage}</div><div>Covers: {agreement.coveredAssetIds.join(', ')}</div><div>Resolution target: {agreement.resolutionTargetHours} hours</div><div>Renews {agreement.renewalDate}</div></>}</div>}
+                  {preview && <div className="record-preview case-related-preview" id="case-record-preview" aria-label="Linked record details"><div className="record-preview-heading"><span className="panel-kicker">LINKED RECORD</span><button className="icon-button" onClick={() => setPreview(null)} aria-label="Close linked record details"><X size={16} /></button></div>{preview === 'asset' && asset && <><h3>{asset.id} · {asset.name}</h3><p>Customer Asset · {asset.status}</p><div>{asset.location}</div><div>{asset.type}</div><div>{asset.company}</div><div className="asset-history"><strong>Service history</strong>{history.length ? history.map((item) => <div key={item.id}>{item.id} · {item.subject} <span>{item.status}</span></div>) : <p>No completed Cases yet.</p>}</div></>}{preview === 'agreement' && agreement && <><h3>{agreement.id} · {agreement.name}</h3><p>Service Agreement · {agreement.status}</p><div>{agreement.coverage}</div><div>Covers: {agreement.coveredAssetIds.join(', ')}</div><div>Resolution target: {agreement.resolutionTargetHours} hours</div><div>Renews {agreement.renewalDate}</div></>}</div>}
                 </section>
 
                 <section className="case-related-section" aria-label="Related work">
@@ -193,16 +198,16 @@ export function CaseJourneyView({
             </div>
           </div>
         </div>
-        <div className="saved-boundary"><CircleHelp size={17} /> The Task belongs to this Case. Ravi’s WhatsApp conversation is reached through his Contact.</div>
+        <div className="saved-boundary"><CircleHelp size={17} /> The Task belongs to this Case. The active conversation link is part of this proposed prototype experience.</div>
       </div>
     </main>
   )
 }
 
 
-export function TechnicianTaskView({ task, onComplete, onBack }: { task: ServiceTask; onComplete: (note: string) => void; onBack: () => void }) {
+export function TechnicianTaskView({ task, onComplete, onViewCase, onBack }: { task: ServiceTask; onComplete: (note: string) => void; onViewCase: () => void; onBack: () => void }) {
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const assignee = serviceUsers.find((item) => item.id === task.assigneeId)
-  return <main className="draft-view" aria-labelledby="technician-task-title"><div className="draft-topbar"><button className="back-link" onClick={onBack}><ArrowLeft size={17} /> Back to Case</button><span className="draft-status"><span /> Technician Task</span></div><div className="draft-content"><div className="draft-breadcrumb">Tasks <ChevronRight size={14} /> {task.id}</div><div className="demo-role-banner"><span className="demo-role-avatar">SR</span><div><strong>Viewing as {assignee?.name ?? 'Sanjay Rao'} · Technician</strong><span>Demo role switch · Back to Case returns to Arun Mehta.</span></div></div><div className="draft-hero"><div className="draft-hero-icon"><ClipboardList size={24} /></div><div><span className="panel-kicker">{task.id} · CASE {task.caseId}</span><h1 id="technician-task-title">{task.subject}</h1><p>Assigned to {assignee?.name ?? 'Technician'} · Internal deadline {formatDateTime(task.dueAt)}</p></div></div><section className="standalone-card draft-form-card"><div className="form-card-heading"><h2>Complete the work</h2><span>Technician work note</span></div><p className="work-instruction">Coordinate site access with Ravi if needed, then record what was repaired and how cooling was verified. The deadline is internal, not a confirmed appointment.</p><div className="field"><label htmlFor="technician-note">Work note</label><textarea id="technician-note" rows={5} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Describe the repair and verification" /></div>{error && <span className="field-error" role="alert">{error}</span>}<button className="primary-button" onClick={() => { if (!note.trim()) { setError('Enter a work note before completing the Task.'); return } onComplete(note.trim()) }}><CheckCircle2 size={16} /> Complete Task</button></section></div></main>
+  return <main className="draft-view" aria-labelledby="technician-task-title"><div className="draft-topbar"><button className="back-link" onClick={onBack}><ArrowLeft size={17} /> Back to Tasks</button><span className="draft-status"><span /> Technician Task</span></div><div className="draft-content"><div className="draft-breadcrumb">Tasks <ChevronRight size={14} /> {task.id}</div><div className="demo-role-banner"><span className="demo-role-avatar">SR</span><div><strong>Viewing as {assignee?.name ?? 'Sanjay Rao'} · Technician</strong><span>Demo role switch · related Case returns to Arun Mehta.</span></div></div><div className="draft-hero"><div className="draft-hero-icon"><ClipboardList size={24} /></div><div><span className="panel-kicker">{task.id} · CASE {task.caseId}</span><h1 id="technician-task-title">{task.subject}</h1><p>Assigned to {assignee?.name ?? 'Technician'} · Internal deadline {formatDateTime(task.dueAt)}</p></div></div><button type="button" className="task-related-case-link" onClick={onViewCase}>Related Case: {task.caseId} <ChevronRight size={15} /></button><section className="standalone-card draft-form-card"><div className="form-card-heading"><h2>Complete the work</h2><span>Technician work note</span></div><p className="work-instruction">Coordinate site access with Ravi if needed, then record what was repaired and how cooling was verified. The deadline is internal, not a confirmed appointment.</p><div className="field"><label htmlFor="technician-note">Work note</label><textarea id="technician-note" rows={5} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Describe the repair and verification" /></div>{error && <span className="field-error" role="alert">{error}</span>}<button className="primary-button" onClick={() => { if (!note.trim()) { setError('Enter a work note before completing the Task.'); return } onComplete(note.trim()) }}><CheckCircle2 size={16} /> Complete Task</button></section></div></main>
 }

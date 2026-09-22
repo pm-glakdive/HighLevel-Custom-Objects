@@ -128,7 +128,7 @@ export const assets: CustomerAsset[] = [
   {
     id: 'AC-001',
     name: 'Lobby AC',
-    company: 'Northstar Offices',
+    company: 'Riverside Business Centre',
     location: 'Main lobby',
     type: 'Air conditioner',
     status: 'Active',
@@ -136,7 +136,7 @@ export const assets: CustomerAsset[] = [
   {
     id: 'AC-002',
     name: 'Conference-room AC',
-    company: 'Northstar Offices',
+    company: 'Riverside Business Centre',
     location: 'Conference room',
     type: 'Air conditioner',
     status: 'Active',
@@ -146,7 +146,7 @@ export const assets: CustomerAsset[] = [
 export const agreements: ServiceAgreement[] = [
   {
     id: 'AMC-104',
-    name: 'Northstar Annual Maintenance',
+    name: 'Riverside Annual Maintenance',
     status: 'Active',
     coveredAssetIds: ['AC-002'],
     resolutionTargetHours: 24,
@@ -166,9 +166,9 @@ export const contacts: Contact[] = [
     id: 'contact-ravi',
     name: 'Ravi Kumar',
     initials: 'RK',
-    email: 'ravi.kumar@northstar.co',
+    email: 'ravi.kumar@riverside.example',
     phone: '+91 98765 43210',
-    company: 'Northstar Offices',
+    company: 'Riverside Business Centre',
     role: 'Facilities Manager',
     color: 'blue',
   },
@@ -176,9 +176,9 @@ export const contacts: Contact[] = [
     id: 'contact-anika',
     name: 'Anika Shah',
     initials: 'AS',
-    email: 'anika@northstar.co',
+    email: 'anika@riverside.example',
     phone: '+91 98210 44511',
-    company: 'Northstar Offices',
+    company: 'Riverside Business Centre',
     role: 'Office Manager',
     color: 'violet',
   },
@@ -204,7 +204,7 @@ export const conversations: Conversation[] = [
     messages: [
       {
         id: 'message-ravi-1',
-        text: 'Hi, this is Ravi from Northstar Offices.',
+        text: 'Hi, this is Ravi from Riverside Business Centre.',
         time: '9:41 AM',
         direction: 'inbound',
       },
