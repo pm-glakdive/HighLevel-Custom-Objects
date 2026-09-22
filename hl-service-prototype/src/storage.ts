@@ -1,12 +1,18 @@
-import type { ServiceCase } from './data'
+import type { CaseActivity, ServiceCase, ServiceTask, ServicesBooking, StoredMessage } from './data'
 
-const STORAGE_KEY = 'hl-service-prototype-demo-v2'
+const STORAGE_KEY = 'hl-service-prototype-demo-v3'
+const PREVIOUS_STORAGE_KEY = 'hl-service-prototype-demo-v2'
 
 export interface DemoState {
   loggedIn: boolean
   selectedConversationId: string | null
   savedCaseId: string | null
   savedCases: ServiceCase[]
+  tasks: ServiceTask[]
+  bookings: ServicesBooking[]
+  activities: CaseActivity[]
+  outboundMessages: StoredMessage[]
+  updateCaseId: string | null
 }
 
 export const emptyDemoState: DemoState = {
@@ -14,24 +20,36 @@ export const emptyDemoState: DemoState = {
   selectedConversationId: null,
   savedCaseId: null,
   savedCases: [],
+  tasks: [],
+  bookings: [],
+  activities: [],
+  outboundMessages: [],
+  updateCaseId: null,
+}
+
+function validRecords<T>(value: unknown, fields: string[]): T[] {
+  return Array.isArray(value) ? value.filter((item): item is T =>
+    item !== null && typeof item === 'object' && fields.every((field) => typeof (item as Record<string, unknown>)[field] === 'string')) : []
 }
 
 export function loadDemoState(): DemoState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(PREVIOUS_STORAGE_KEY)
     if (!raw) return emptyDemoState
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return emptyDemoState
     const state = parsed as Partial<DemoState>
-    const savedCases = Array.isArray(state.savedCases)
-      ? state.savedCases.filter((item): item is ServiceCase =>
-        item !== null && typeof item === 'object' && typeof item.id === 'string' && typeof item.contactId === 'string' && typeof item.createdAt === 'string')
-      : []
+    const savedCases = validRecords<ServiceCase>(state.savedCases, ['id', 'contactId', 'createdAt'])
     return {
       loggedIn: state.loggedIn === true,
       selectedConversationId: typeof state.selectedConversationId === 'string' ? state.selectedConversationId : null,
       savedCaseId: typeof state.savedCaseId === 'string' && savedCases.some((item) => item.id === state.savedCaseId) ? state.savedCaseId : null,
       savedCases,
+      tasks: validRecords<ServiceTask>(state.tasks, ['id', 'caseId', 'assigneeId', 'dueAt', 'status']),
+      bookings: validRecords<ServicesBooking>(state.bookings, ['id', 'contactId', 'assetId', 'scheduledAt']),
+      activities: validRecords<CaseActivity>(state.activities, ['id', 'caseId', 'createdAt', 'description']),
+      outboundMessages: validRecords<StoredMessage>(state.outboundMessages, ['id', 'conversationId', 'text', 'createdAt']),
+      updateCaseId: typeof state.updateCaseId === 'string' && savedCases.some((item) => item.id === state.updateCaseId) ? state.updateCaseId : null,
     }
   } catch {
     return emptyDemoState
@@ -49,6 +67,7 @@ export function saveDemoState(state: DemoState): void {
 export function clearDemoState(): void {
   try {
     localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(PREVIOUS_STORAGE_KEY)
   } catch {
     // In-memory reset remains available.
   }

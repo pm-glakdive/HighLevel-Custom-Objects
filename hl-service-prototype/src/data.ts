@@ -16,6 +16,11 @@ export interface Message {
   text: string
   time: string
   direction: 'inbound' | 'outbound'
+  createdAt?: string
+}
+
+export interface StoredMessage extends Message {
+  conversationId: string
 }
 
 export interface Conversation {
@@ -31,7 +36,7 @@ export interface ServiceCase {
   id: string
   contactId: string
   subject: string
-  status: 'Open' | 'In progress' | 'Resolved'
+  status: 'Open' | 'In progress' | 'Waiting' | 'Resolved' | 'Closed'
   priority: 'Low' | 'Medium' | 'High'
   assetId: string | null
   agreementId: string | null
@@ -41,6 +46,44 @@ export interface ServiceCase {
   source: Channel
   appliedResolutionTargetHours: number | null
   targetResolutionAt: string | null
+  waitingReason?: string
+  bookingReferenceId?: string
+  resolutionCode?: string
+  resolutionSummary?: string
+  resolvedAt?: string
+  customerUpdateAt?: string
+  customerUpdateText?: string
+  closedAt?: string
+}
+
+export interface ServiceTask {
+  id: string
+  caseId: string
+  subject: string
+  assigneeId: string
+  dueAt: string
+  status: 'Open' | 'Completed'
+  createdAt: string
+  completedAt?: string
+  workNote?: string
+}
+
+export interface ServicesBooking {
+  id: string
+  contactId: string
+  assetId: string
+  scheduledAt: string
+  location: string
+  status: 'Booked'
+  createdAt: string
+}
+
+export interface CaseActivity {
+  id: string
+  caseId: string
+  actorId: string
+  createdAt: string
+  description: string
 }
 
 export interface CustomerAsset {
@@ -115,6 +158,7 @@ export const agreements: ServiceAgreement[] = [
 export const serviceUsers: ServiceUser[] = [
   { id: 'user-priya', name: 'Priya Nair', role: 'Service Agent' },
   { id: 'user-arun', name: 'Arun Mehta', role: 'Service Manager' },
+  { id: 'user-sanjay', name: 'Sanjay Rao', role: 'Technician' },
 ]
 
 export const contacts: Contact[] = [

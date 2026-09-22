@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft, ArrowRight, BadgeCheck, BriefcaseBusiness, ChevronRight,
-  CircleHelp, Clock3, Inbox, Mail, MessageCircle, MessageSquareText,
+  CircleHelp, Clock3, Inbox, Mail, MessageCircle, MessageSquareText, Send,
   PanelRightClose, PanelRightOpen, Plus, Search, ShieldCheck, Smartphone,
   RotateCcw, Sparkles, X,
 } from 'lucide-react'
@@ -9,9 +9,11 @@ import {
   agreements, applicableAgreements, assets, contacts, conversations, createCaseDraft,
   nextCaseId, serviceCases, serviceUsers,
   type CaseDraft, type Channel, type Contact, type CustomerAsset,
-  type ServiceAgreement, type ServiceCase,
+  type CaseActivity, type Message, type ServiceAgreement, type ServiceCase,
+  type ServiceTask, type ServicesBooking, type StoredMessage,
 } from './data'
 import { clearDemoState, loadDemoState, saveDemoState } from './storage'
+import { BookingView, CaseJourneyView, TechnicianTaskView } from './WorkflowViews'
 
 type InboxTab = 'All' | 'Unread'
 
@@ -23,6 +25,11 @@ function formatDate(value: string): string {
 
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' }).format(new Date(value))
+}
+
+function nextRecordId(prefix: string, records: { id: string }[], start: number): string {
+  const highest = records.reduce((value, record) => Math.max(value, Number(record.id.replace(`${prefix}-`, '')) || 0), start - 1)
+  return `${prefix}-${highest + 1}`
 }
 
 function getAsset(id: string | null): CustomerAsset | null {
@@ -185,38 +192,6 @@ function DraftView({ draft, contact, onChange, onBack, onCreate }: {
   )
 }
 
-type RecordPreview = 'contact' | 'asset' | 'agreement' | null
-
-function SavedCaseView({ serviceCase, onBack }: { serviceCase: ServiceCase; onBack: () => void }) {
-  const [preview, setPreview] = useState<RecordPreview>(null)
-  const contact = getContact(serviceCase.contactId)
-  const asset = getAsset(serviceCase.assetId)
-  const agreement = getAgreement(serviceCase.agreementId)
-  const targetLabel = serviceCase.appliedResolutionTargetHours === null ? 'No target applied' : `${serviceCase.appliedResolutionTargetHours}-hour resolution target`
-
-  return (
-    <main className="draft-view" aria-labelledby="saved-case-title">
-      <div className="draft-topbar"><button className="back-link" onClick={onBack}><ArrowLeft size={17} /> Back to Ravi’s conversation</button><span className="saved-status"><span /> Saved Case</span></div>
-      <div className="draft-content">
-        <div className="draft-breadcrumb">Service Cases <ChevronRight size={14} /> {serviceCase.id}</div>
-        <div className="draft-hero"><div className="draft-hero-icon"><BriefcaseBusiness size={24} /></div><div><span className="panel-kicker">SERVICE CASE · {serviceCase.id}</span><h1 id="saved-case-title">{serviceCase.subject}</h1><p>Created {formatDateTime(serviceCase.createdAt)}</p></div></div>
-        <div className="saved-case-grid">
-          <div className="saved-case-main">
-            <section className="draft-form-card"><div className="form-card-heading"><h2>Issue</h2><span className="status-pill"><span />{serviceCase.status}</span></div><p className="saved-description">{serviceCase.description}</p><div className="saved-source"><ChannelIcon channel={serviceCase.source} size={15} /> Created from {serviceCase.source} <span>· Source information only</span></div></section>
-            <section className="draft-form-card"><div className="form-card-heading"><h2>Service commitment</h2></div><div className="commitment-value"><Clock3 size={21} /><div><strong>{targetLabel}</strong><span>Applied target snapshot on {serviceCase.id}</span></div></div>{serviceCase.targetResolutionAt && <div className="detail-line"><span>Target resolution</span><strong>{formatDateTime(serviceCase.targetResolutionAt)}</strong></div>}<p className="commitment-explain">The target on this Case stays the same if the Agreement is edited later.</p></section>
-          </div>
-          <div className="draft-side-stack">
-            <section className="draft-form-card"><div className="form-card-heading"><h2>Case details</h2></div><div className="detail-line"><span>Status</span><strong>{serviceCase.status}</strong></div><div className="detail-line"><span>Owner</span><strong>{getOwnerName(serviceCase.ownerId)}</strong></div><div className="detail-line"><span>Priority</span><strong>{serviceCase.priority}</strong></div><div className="detail-line"><span>Created</span><strong>{formatDateTime(serviceCase.createdAt)}</strong></div></section>
-            <section className="draft-form-card"><div className="form-card-heading"><h2>Linked records</h2></div><p className="record-helper">These links are on the Case record.</p><a href="#record-preview" className="record-link" onClick={(event) => { event.preventDefault(); setPreview('contact') }}><span><small>REQUESTER · CONTACT</small><strong>{contact.name}</strong></span><ChevronRight size={17} /></a>{asset && <a href="#record-preview" className="record-link" onClick={(event) => { event.preventDefault(); setPreview('asset') }}><span><small>CUSTOMER ASSET</small><strong>{asset.id} · {asset.name}</strong></span><ChevronRight size={17} /></a>}{agreement && <a href="#record-preview" className="record-link" onClick={(event) => { event.preventDefault(); setPreview('agreement') }}><span><small>SERVICE AGREEMENT</small><strong>{agreement.id} · {agreement.name}</strong></span><ChevronRight size={17} /></a>}</section>
-            {preview && <section className="record-preview" id="record-preview" aria-label="Linked record details"><div className="record-preview-heading"><span className="panel-kicker">LINKED RECORD</span><button className="icon-button" onClick={() => setPreview(null)} aria-label="Close linked record details"><X size={16} /></button></div>{preview === 'contact' && <><h3>{contact.name}</h3><p>Contact · {contact.role}</p><div>{contact.company}</div><div>{contact.phone}</div><div>{contact.email}</div></>}{preview === 'asset' && asset && <><h3>{asset.id} · {asset.name}</h3><p>Customer Asset · {asset.status}</p><div>{asset.location}</div><div>{asset.type}</div><div>{asset.company}</div></>}{preview === 'agreement' && agreement && <><h3>{agreement.id} · {agreement.name}</h3><p>Service Agreement · {agreement.status}</p><div>{agreement.coverage}</div><div>Covers: {agreement.coveredAssetIds.join(', ')}</div><div>Resolution target: {agreement.resolutionTargetHours} hours</div><div>Renews {agreement.renewalDate}</div></>}</section>}
-          </div>
-        </div>
-        <div className="saved-boundary"><CircleHelp size={17} /> This Case is associated with Ravi and the selected records. Ravi’s WhatsApp conversation has no active Case binding.</div>
-      </div>
-    </main>
-  )
-}
-
 function App() {
   const [loggedIn, setLoggedIn] = useState(initialDemoState.loggedIn)
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(initialDemoState.selectedConversationId)
@@ -227,28 +202,52 @@ function App() {
   const [draft, setDraft] = useState<CaseDraft | null>(null)
   const [savedCases, setSavedCases] = useState<ServiceCase[]>(initialDemoState.savedCases)
   const [savedCaseId, setSavedCaseId] = useState<string | null>(initialDemoState.savedCaseId)
+  const [tasks, setTasks] = useState<ServiceTask[]>(initialDemoState.tasks)
+  const [bookings, setBookings] = useState<ServicesBooking[]>(initialDemoState.bookings)
+  const [activities, setActivities] = useState<CaseActivity[]>(initialDemoState.activities)
+  const [outboundMessages, setOutboundMessages] = useState<StoredMessage[]>(initialDemoState.outboundMessages)
+  const [updateCaseId, setUpdateCaseId] = useState<string | null>(initialDemoState.updateCaseId)
+  const [messageDraft, setMessageDraft] = useState(initialDemoState.updateCaseId ? `Hi Ravi, the conference-room AC has been repaired and cooling has been verified. Case ${initialDemoState.updateCaseId} is resolved.` : '')
+  const [messageError, setMessageError] = useState('')
+  const [bookingViewCaseId, setBookingViewCaseId] = useState<string | null>(null)
+  const [createdBookingId, setCreatedBookingId] = useState<string | null>(null)
+  const [technicianTaskId, setTechnicianTaskId] = useState<string | null>(null)
 
   useEffect(() => {
-    saveDemoState({ loggedIn, selectedConversationId, savedCaseId, savedCases })
-  }, [loggedIn, selectedConversationId, savedCaseId, savedCases])
+    saveDemoState({ loggedIn, selectedConversationId, savedCaseId, savedCases, tasks, bookings, activities, outboundMessages, updateCaseId })
+  }, [loggedIn, selectedConversationId, savedCaseId, savedCases, tasks, bookings, activities, outboundMessages, updateCaseId])
 
   const allCases = [...serviceCases, ...savedCases]
   const selectedConversation = conversations.find((item) => item.id === selectedConversationId) ?? null
   const selectedContact = selectedConversation ? getContact(selectedConversation.contactId) : null
   const inspectedCase = allCases.find((item) => item.id === inspectedCaseId) ?? null
   const openSavedCase = savedCases.find((item) => item.id === savedCaseId) ?? null
+  const bookingCase = savedCases.find((item) => item.id === bookingViewCaseId) ?? null
+  const technicianTask = tasks.find((item) => item.id === technicianTaskId) ?? null
+  const selectedMessages: Message[] = selectedConversation ? [...selectedConversation.messages, ...outboundMessages.filter((item) => item.conversationId === selectedConversation.id)] : []
   const filteredConversations = useMemo(() => conversations.filter((conversation) => {
     if (inboxTab === 'Unread' && !conversation.unread) return false
     const contact = getContact(conversation.contactId)
     const query = search.trim().toLowerCase()
-    return !query || contact.name.toLowerCase().includes(query) || conversation.messages.some((message) => message.text.toLowerCase().includes(query))
-  }), [inboxTab, search])
+    return !query || contact.name.toLowerCase().includes(query) || [...conversation.messages, ...outboundMessages.filter((message) => message.conversationId === conversation.id)].some((message) => message.text.toLowerCase().includes(query))
+  }), [inboxTab, search, outboundMessages])
+
+  function addActivity(caseId: string, actorId: string, description: string) {
+    setActivities((current) => [...current, { id: crypto.randomUUID(), caseId, actorId, description, createdAt: new Date().toISOString() }])
+  }
+
+  function updateSavedCase(caseId: string, changes: Partial<ServiceCase>) {
+    setSavedCases((current) => current.map((item) => item.id === caseId ? { ...item, ...changes } : item))
+  }
 
   function selectConversation(id: string) {
     setSelectedConversationId(id)
     setInspectedCaseId(null)
     setDraft(null)
     setSavedCaseId(null)
+    setUpdateCaseId(null)
+    setBookingViewCaseId(null)
+    setTechnicianTaskId(null)
     setPanelOpen(true)
   }
 
@@ -263,6 +262,7 @@ function App() {
     if (savedCases.some((item) => item.id === id)) {
       setSavedCaseId(id)
       setInspectedCaseId(null)
+      setUpdateCaseId(null)
     } else {
       setInspectedCaseId(id)
     }
@@ -294,12 +294,119 @@ function App() {
     setDraft(null)
   }
 
+  function startWork(caseId: string) {
+    if (savedCases.find((item) => item.id === caseId)?.status !== 'Open') return
+    updateSavedCase(caseId, { status: 'In progress' })
+    addActivity(caseId, 'user-priya', 'Started work on the Case.')
+  }
+
+  function createTask(caseId: string, subject: string, assigneeId: string, dueAt: string) {
+    if (savedCases.find((item) => item.id === caseId)?.status !== 'In progress' || tasks.some((item) => item.caseId === caseId)) return
+    const task: ServiceTask = { id: nextRecordId('TASK', tasks, 201), caseId, subject, assigneeId, dueAt, status: 'Open', createdAt: new Date().toISOString() }
+    setTasks((current) => [...current, task])
+    addActivity(caseId, 'user-priya', `Created ${task.id} for ${getOwnerName(assigneeId)}; due ${formatDateTime(dueAt)}.`)
+  }
+
+  function createBooking(scheduledAt: string, location: string) {
+    if (!bookingCase || !bookingCase.assetId) return
+    const booking: ServicesBooking = {
+      id: nextRecordId('BOOK', bookings, 501),
+      contactId: bookingCase.contactId,
+      assetId: bookingCase.assetId,
+      scheduledAt,
+      location,
+      status: 'Booked',
+      createdAt: new Date().toISOString(),
+    }
+    setBookings((current) => [...current, booking])
+    setCreatedBookingId(booking.id)
+  }
+
+  function recordBookingReference(caseId: string, bookingId: string) {
+    const serviceCase = savedCases.find((item) => item.id === caseId)
+    const booking = bookings.find((item) => item.id === bookingId)
+    if (!serviceCase || !booking || serviceCase.status !== 'In progress' || booking.contactId !== serviceCase.contactId || booking.assetId !== serviceCase.assetId) return
+    updateSavedCase(caseId, { bookingReferenceId: bookingId })
+    addActivity(caseId, 'user-priya', `Manually recorded Services booking ID ${bookingId} on the Case.`)
+  }
+
+  function moveToWaiting(caseId: string, reason: string) {
+    const serviceCase = savedCases.find((item) => item.id === caseId)
+    if (!serviceCase || serviceCase.status !== 'In progress' || !serviceCase.bookingReferenceId || !reason) return
+    updateSavedCase(caseId, { status: 'Waiting', waitingReason: reason })
+    addActivity(caseId, 'user-priya', `Moved Case to Waiting: ${reason}.`)
+  }
+
+  function completeTask(taskId: string, note: string) {
+    const task = tasks.find((item) => item.id === taskId)
+    if (!task || task.status !== 'Open' || !note.trim()) return
+    const completedAt = new Date().toISOString()
+    setTasks((current) => current.map((item) => item.id === taskId ? { ...item, status: 'Completed', workNote: note.trim(), completedAt } : item))
+    addActivity(task.caseId, task.assigneeId, `Completed ${task.id}. Work note: ${note.trim()}`)
+    setTechnicianTaskId(null)
+  }
+
+  function resolveCase(caseId: string, code: string, summary: string) {
+    const serviceCase = savedCases.find((item) => item.id === caseId)
+    if (!serviceCase || serviceCase.status !== 'Waiting' || !tasks.some((item) => item.caseId === caseId && item.status === 'Completed') || !code || !summary.trim()) return
+    const resolvedAt = new Date().toISOString()
+    updateSavedCase(caseId, { status: 'Resolved', waitingReason: undefined, resolutionCode: code, resolutionSummary: summary.trim(), resolvedAt })
+    addActivity(caseId, 'user-priya', `Resolved Case: ${code}. ${summary.trim()}`)
+  }
+
+  function openConversationForUpdate(caseId: string) {
+    const serviceCase = savedCases.find((item) => item.id === caseId)
+    const conversation = conversations.find((item) => item.contactId === serviceCase?.contactId)
+    if (!serviceCase || serviceCase.status !== 'Resolved' || !conversation) return
+    setSelectedConversationId(conversation.id)
+    setSavedCaseId(null)
+    setUpdateCaseId(caseId)
+    setMessageDraft(`Hi Ravi, the conference-room AC has been repaired and cooling has been verified. Case ${caseId} is resolved.`)
+    setMessageError('')
+    setPanelOpen(true)
+  }
+
+  function sendCustomerUpdate() {
+    const serviceCase = savedCases.find((item) => item.id === updateCaseId)
+    if (!serviceCase || !selectedConversation || serviceCase.status !== 'Resolved') return
+    const text = messageDraft.trim()
+    if (!text.includes(serviceCase.id) || !/repair/i.test(text)) {
+      setMessageError(`Mention ${serviceCase.id} and the repair in the customer update.`)
+      return
+    }
+    const createdAt = new Date().toISOString()
+    const message: StoredMessage = { id: crypto.randomUUID(), conversationId: selectedConversation.id, text, direction: 'outbound', createdAt, time: formatDateTime(createdAt) }
+    setOutboundMessages((current) => [...current, message])
+    updateSavedCase(serviceCase.id, { customerUpdateAt: createdAt, customerUpdateText: text })
+    addActivity(serviceCase.id, 'user-priya', `Manually sent Ravi a WhatsApp update mentioning ${serviceCase.id} and the repair.`)
+    setUpdateCaseId(null)
+    setMessageDraft('')
+    setMessageError('')
+  }
+
+  function closeCase(caseId: string) {
+    const serviceCase = savedCases.find((item) => item.id === caseId)
+    if (!serviceCase || serviceCase.status !== 'Resolved' || !serviceCase.customerUpdateAt) return
+    updateSavedCase(caseId, { status: 'Closed', closedAt: new Date().toISOString() })
+    addActivity(caseId, 'user-priya', 'Closed Case after confirming the customer update.')
+  }
+
   function resetDemo() {
     clearDemoState()
     setLoggedIn(false)
     setSelectedConversationId(null)
     setSavedCaseId(null)
     setSavedCases([])
+    setTasks([])
+    setBookings([])
+    setActivities([])
+    setOutboundMessages([])
+    setUpdateCaseId(null)
+    setMessageDraft('')
+    setMessageError('')
+    setBookingViewCaseId(null)
+    setCreatedBookingId(null)
+    setTechnicianTaskId(null)
     setDraft(null)
     setInspectedCaseId(null)
     setPanelOpen(true)
@@ -313,7 +420,7 @@ function App() {
     <div className="app-shell">
       <aside className="app-rail" aria-label="Workspace navigation"><div className="rail-brand" aria-label="HighLevel"><span>H<span>↑</span></span></div><div className="rail-divider" /><div className="rail-active" title="Conversations"><MessageSquareText size={21} /></div><div className="rail-spacer" /><div className="rail-avatar" title="Priya Nair">PN</div></aside>
       <div className="workspace">
-        <header className="topbar"><div className="topbar-title"><span className="topbar-product">Conversations</span><span className="topbar-divider" /><span className="topbar-location">Team inbox</span></div><div className="topbar-right"><span className="workspace-label"><span className="workspace-dot" /> Northstar Service</span><button className="reset-demo" onClick={resetDemo}><RotateCcw size={13} /> Reset demo</button><span className="agent-badge">PN</span></div></header>
+        <header className="topbar"><div className="topbar-title"><span className="topbar-product">{bookingViewCaseId ? 'Services' : technicianTaskId ? 'Tasks' : openSavedCase ? 'Service Cases' : 'Conversations'}</span><span className="topbar-divider" /><span className="topbar-location">{bookingViewCaseId ? 'On-site visit' : technicianTaskId ? 'Technician work' : openSavedCase ? 'Case detail' : 'Team inbox'}</span></div><div className="topbar-right"><span className="workspace-label"><span className="workspace-dot" /> Northstar Service</span><button className="reset-demo" onClick={resetDemo}><RotateCcw size={13} /> Reset demo</button><span className="agent-badge">PN</span></div></header>
         <div className="workspace-body">
           <aside className="inbox-panel" aria-label="Conversations inbox">
             <div className="inbox-heading"><div><span className="eyebrow">INBOX</span><h1>Team inbox</h1></div><span className="inbox-total">{conversations.length}</span></div>
@@ -321,7 +428,8 @@ function App() {
             <label className="search-box"><Search size={17} /><input aria-label="Search conversations" placeholder="Search conversations" value={search} onChange={(event) => setSearch(event.target.value)} />{search && <button onClick={() => setSearch('')} aria-label="Clear search"><X size={15} /></button>}</label>
             <div className="conversation-list">{filteredConversations.length ? filteredConversations.map((conversation) => {
               const contact = getContact(conversation.contactId)
-              const latest = conversation.messages[conversation.messages.length - 1]
+              const sent = outboundMessages.filter((item) => item.conversationId === conversation.id)
+              const latest = sent[sent.length - 1] ?? conversation.messages[conversation.messages.length - 1]
               return <button key={conversation.id} className={`conversation-item ${selectedConversationId === conversation.id ? 'selected' : ''}`} onClick={() => selectConversation(conversation.id)} aria-label={`Open ${contact.name} conversation`}>
                 <Avatar contact={contact} /><span className="conversation-text"><span className="conversation-row"><strong>{contact.name}</strong><time>{conversation.updatedAt}</time></span><span className="conversation-company">{contact.company}</span><span className="conversation-preview"><span className={`channel-mini ${conversation.channel === 'WhatsApp' ? 'channel-mini--whatsapp' : ''}`}><ChannelIcon channel={conversation.channel} size={13} /></span>{latest.text}</span></span>{conversation.unread && <span className="unread-dot" aria-label="Unread" />}
               </button>
@@ -329,12 +437,12 @@ function App() {
             <div className="inbox-footer"><Inbox size={16} /> {filteredConversations.length} conversations</div>
           </aside>
 
-          {draft && selectedContact ? <DraftView draft={draft} contact={selectedContact} onChange={setDraft} onBack={() => setDraft(null)} onCreate={createCase} /> : openSavedCase ? <SavedCaseView serviceCase={openSavedCase} onBack={() => { setSavedCaseId(null); setPanelOpen(true) }} /> : <>
+          {draft && selectedContact ? <DraftView draft={draft} contact={selectedContact} onChange={setDraft} onBack={() => setDraft(null)} onCreate={createCase} /> : bookingCase && getAsset(bookingCase.assetId) ? <BookingView contact={getContact(bookingCase.contactId)} asset={getAsset(bookingCase.assetId)!} createdBooking={bookings.find((item) => item.id === createdBookingId) ?? null} onSave={createBooking} onBack={() => { setBookingViewCaseId(null); setCreatedBookingId(null) }} /> : technicianTask ? <TechnicianTaskView task={technicianTask} onComplete={(note) => completeTask(technicianTask.id, note)} onBack={() => setTechnicianTaskId(null)} /> : openSavedCase ? <CaseJourneyView serviceCase={openSavedCase} allCases={allCases} tasks={tasks} bookings={bookings} activities={activities} onBack={() => { setSavedCaseId(null); setPanelOpen(true) }} onStartWork={() => startWork(openSavedCase.id)} onCreateTask={(subject, assigneeId, dueAt) => createTask(openSavedCase.id, subject, assigneeId, dueAt)} onOpenBooking={() => { setBookingViewCaseId(openSavedCase.id); setCreatedBookingId(null) }} onRecordBooking={(id) => recordBookingReference(openSavedCase.id, id)} onSetWaiting={(reason) => moveToWaiting(openSavedCase.id, reason)} onOpenTask={setTechnicianTaskId} onResolve={(code, summary) => resolveCase(openSavedCase.id, code, summary)} onOpenConversation={() => openConversationForUpdate(openSavedCase.id)} onCloseCase={() => closeCase(openSavedCase.id)} /> : <>
             <main className="conversation-pane" aria-label="Conversation">
               {selectedConversation && selectedContact ? <>
                 <div className="conversation-header"><div className="conversation-person"><Avatar contact={selectedContact} /><div><h2>{selectedContact.name}</h2><span><ChannelIcon channel={selectedConversation.channel} size={14} /> {selectedConversation.channel} conversation</span></div></div><button className="header-panel-button" onClick={() => setPanelOpen(!panelOpen)} aria-label={panelOpen ? 'Hide contact details' : 'Show contact details'}>{panelOpen ? <PanelRightClose size={19} /> : <PanelRightOpen size={19} />}<span>{panelOpen ? 'Hide details' : 'Show details'}</span></button></div>
-                <div className="message-area"><div className="date-divider"><span>Today · 22 Sep 2026</span></div><div className="thread-channel"><ChannelIcon channel={selectedConversation.channel} size={15} /> {selectedConversation.channel}</div>{selectedConversation.messages.map((message, index) => <div key={message.id} className="message-row"><Avatar contact={selectedContact} /><div className="message-body"><div className="message-bubble">{message.text}</div><span className="message-time">{message.time}{selectedConversation.unread && index === selectedConversation.messages.length - 1 && <span className="new-label">NEW</span>}</span></div></div>)}</div>
-                <div className="conversation-bottom"><div className="conversation-bottom-icon"><MessageSquareText size={19} /></div><div><strong>Turn this request into service work</strong><span>Review related Cases in the contact panel before choosing the next step.</span></div></div>
+                <div className="message-area"><div className="date-divider"><span>Today · 22 Sep 2026</span></div><div className="thread-channel"><ChannelIcon channel={selectedConversation.channel} size={15} /> {selectedConversation.channel}</div>{selectedMessages.map((message, index) => <div key={message.id} className={`message-row ${message.direction === 'outbound' ? 'message-row--outbound' : ''}`}>{message.direction === 'inbound' && <Avatar contact={selectedContact} />}<div className="message-body"><div className="message-bubble">{message.text}</div><span className="message-time">{message.time}{selectedConversation.unread && message.direction === 'inbound' && index === selectedConversation.messages.length - 1 && <span className="new-label">NEW</span>}</span></div>{message.direction === 'outbound' && <span className="avatar avatar--blue message-agent-avatar">PN</span>}</div>)}</div>
+                {updateCaseId ? <div className="conversation-composer"><div className="composer-heading"><strong>Manual WhatsApp update to Ravi</strong><span>Opened through Ravi’s Contact · no conversation-to-Case binding</span></div><label htmlFor="customer-update">Message</label><textarea id="customer-update" rows={3} value={messageDraft} onChange={(event) => setMessageDraft(event.target.value)} />{messageError && <span className="field-error" role="alert">{messageError}</span>}<div className="composer-actions"><span>Sending also records customer-update confirmation on {updateCaseId}.</span><button className="primary-button" onClick={sendCustomerUpdate}><Send size={15} /> Send WhatsApp update</button></div></div> : <div className="conversation-bottom"><div className="conversation-bottom-icon"><MessageSquareText size={19} /></div><div><strong>Turn this request into service work</strong><span>Review related Cases in the contact panel before choosing the next step.</span></div></div>}
               </> : <div className="select-empty"><div className="select-empty-icon"><MessageSquareText size={30} /></div><h2>Select a conversation</h2><p>Open Ravi’s new WhatsApp message to review the customer and related Cases.</p></div>}
             </main>
             {selectedConversation && selectedContact && panelOpen && (inspectedCase ? <CaseInspection serviceCase={inspectedCase} onBack={() => setInspectedCaseId(null)} /> : <ContactPanel contact={selectedContact} relatedCases={allCases.filter((item) => item.contactId === selectedContact.id)} onInspectCase={openCase} onCreateCase={startDraft} onClose={() => setPanelOpen(false)} />)}
