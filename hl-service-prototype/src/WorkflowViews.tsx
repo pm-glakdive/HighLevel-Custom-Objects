@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import {
-  ArrowLeft, BriefcaseBusiness, CalendarDays, CheckCircle2, ChevronRight,
+  ArrowLeft, BriefcaseBusiness, CheckCircle2, ChevronRight,
   CircleHelp, ClipboardList, Clock3, MessageSquareText, Plus, Wrench, X,
 } from 'lucide-react'
 import {
   agreements, assets, contacts, serviceUsers,
-  type CaseActivity, type Contact, type CustomerAsset, type ServiceCase,
-  type ServiceTask, type ServicesBooking,
+  type CaseActivity, type ServiceCase, type ServiceTask,
 } from './data'
 
 function formatDateTime(value: string): string {
@@ -24,15 +23,11 @@ interface CaseJourneyProps {
   serviceCase: ServiceCase
   allCases: ServiceCase[]
   tasks: ServiceTask[]
-  bookings: ServicesBooking[]
   activities: CaseActivity[]
   customerUpdateSent: boolean
   canManage: boolean
   onBack: () => void
   onCreateTask: (subject: string, assigneeId: string, dueAt: string) => void
-  onOpenBooking: () => void
-  onRecordBooking: (bookingId: string) => void
-  onSetWaiting: (reason: string) => void
   onOpenTask: (taskId: string) => void
   onResolve: (code: string, summary: string) => void
   onOpenConversation: () => void
@@ -41,8 +36,8 @@ interface CaseJourneyProps {
 }
 
 export function CaseJourneyView({
-  serviceCase, allCases, tasks, bookings, activities, customerUpdateSent, canManage, onBack,
-  onCreateTask, onOpenBooking, onRecordBooking, onSetWaiting, onOpenTask,
+  serviceCase, allCases, tasks, activities, customerUpdateSent, canManage, onBack,
+  onCreateTask, onOpenTask,
   onResolve, onOpenConversation, onConfirmCustomerUpdate, onCloseCase,
 }: CaseJourneyProps) {
   const [preview, setPreview] = useState<RecordPreview>(null)
@@ -50,8 +45,6 @@ export function CaseJourneyView({
   const [taskSubject, setTaskSubject] = useState('Inspect and repair conference-room AC')
   const [taskAssigneeId, setTaskAssigneeId] = useState('user-sanjay')
   const [taskDueAt, setTaskDueAt] = useState(localDateTimeInput(new Date(Date.now() + 24 * 60 * 60 * 1000)))
-  const [bookingReference, setBookingReference] = useState('')
-  const [waitingReason, setWaitingReason] = useState('')
   const [resolutionCode, setResolutionCode] = useState('')
   const [resolutionSummary, setResolutionSummary] = useState('')
   const [updateConfirmed, setUpdateConfirmed] = useState(false)
@@ -66,7 +59,6 @@ export function CaseJourneyView({
   const orderedActivities = activities.filter((item) => item.caseId === serviceCase.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const latestActivity = orderedActivities[0]
   const history = allCases.filter((item) => item.assetId === asset?.id && (item.status === 'Resolved' || item.status === 'Closed'))
-  const recentBookings = bookings.filter((item) => item.contactId === serviceCase.contactId && item.assetId === serviceCase.assetId)
   useEffect(() => {
     setActiveTab('overview')
     setPreview(null)
@@ -80,26 +72,6 @@ export function CaseJourneyView({
     }
     setFormError('')
     onCreateTask(taskSubject.trim(), taskAssigneeId, new Date(taskDueAt).toISOString())
-  }
-
-  function recordBooking() {
-    const id = bookingReference.trim().toUpperCase()
-    const matchingBooking = recentBookings.find((item) => item.id === id)
-    if (!matchingBooking) {
-      setFormError('Enter a Services booking ID for Ravi and this Asset. Book a visit first if needed.')
-      return
-    }
-    setFormError('')
-    onRecordBooking(id)
-  }
-
-  function saveWaiting() {
-    if (!waitingReason) {
-      setFormError('Choose why this Case is waiting.')
-      return
-    }
-    setFormError('')
-    onSetWaiting(waitingReason)
   }
 
   function saveResolution() {
@@ -172,11 +144,9 @@ export function CaseJourneyView({
 
               {canManage && <section className="case-action-block">
                 <div className="case-action-heading"><div><span className="panel-kicker">WORKFLOW</span><h2>{serviceCase.status === 'Closed' ? 'Journey complete' : 'Next step'}</h2></div><span>{serviceCase.status}</span></div>
-                {(serviceCase.status === 'Open' || serviceCase.status === 'In progress') && !task && <><p>Create a Task for the technician. The Task will carry this Case ID and move an Open Case to In progress.</p><div className="field"><label htmlFor="task-subject">Task</label><input id="task-subject" value={taskSubject} onChange={(event) => setTaskSubject(event.target.value)} /></div><div className="field-pair"><div className="field"><label htmlFor="task-assignee">Assignee</label><select id="task-assignee" value={taskAssigneeId} onChange={(event) => setTaskAssigneeId(event.target.value)}>{serviceUsers.filter((item) => item.role === 'Technician').map((item) => <option key={item.id} value={item.id}>{item.name} · Technician</option>)}</select></div><div className="field"><label htmlFor="task-due">Due time</label><input id="task-due" type="datetime-local" value={taskDueAt} onChange={(event) => setTaskDueAt(event.target.value)} /></div></div><button className="primary-button" onClick={createTask}><Plus size={16} /> Create Task</button></>}
-                {serviceCase.status === 'In progress' && task && !serviceCase.bookingReferenceId && <><p>Book the on-site visit in Services, then enter its ID here as a manual reference.</p><button className="secondary-button" onClick={onOpenBooking}><CalendarDays size={16} /> Open Services booking</button>{recentBookings.length > 0 && <p className="booking-hint">Booking saved in Services: {recentBookings.map((item) => item.id).join(', ')}. Enter the ID below to reference it on this Case.</p>}<div className="field manual-id-field"><label htmlFor="booking-reference">Services booking ID</label><input id="booking-reference" placeholder="For example, BOOK-501" value={bookingReference} onChange={(event) => setBookingReference(event.target.value)} /></div><button className="primary-button" onClick={recordBooking}>Record booking ID on Case</button></>}
-                {serviceCase.status === 'In progress' && serviceCase.bookingReferenceId && <><p>The visit is booked and its ID is recorded. Set the Case to Waiting while the appointment is pending.</p><div className="field"><label htmlFor="waiting-reason">Waiting reason</label><select id="waiting-reason" value={waitingReason} onChange={(event) => setWaitingReason(event.target.value)}><option value="">Choose a reason</option><option value="Waiting for appointment">Waiting for appointment</option><option value="Waiting for parts">Waiting for parts</option></select></div><button className="primary-button" onClick={saveWaiting}>Move to Waiting</button></>}
-                {serviceCase.status === 'Waiting' && task?.status === 'Open' && <><p>The appointment is pending. Open the technician Task to record completed work.</p><button className="primary-button" onClick={() => onOpenTask(task.id)}><Wrench size={16} /> Open technician Task</button></>}
-                {serviceCase.status === 'Waiting' && task?.status === 'Completed' && <><p>The technician has completed the repair. Priya can now resolve the Case.</p><div className="field"><label htmlFor="resolution-code">Resolution code</label><select id="resolution-code" value={resolutionCode} onChange={(event) => setResolutionCode(event.target.value)}><option value="">Choose a code</option><option value="Repair completed">Repair completed</option><option value="No fault found">No fault found</option></select></div><div className="field"><label htmlFor="resolution-summary">Resolution summary</label><textarea id="resolution-summary" rows={4} value={resolutionSummary} onChange={(event) => setResolutionSummary(event.target.value)} placeholder="What was done and what was verified?" /></div><button className="primary-button" onClick={saveResolution}><CheckCircle2 size={16} /> Resolve Case</button></>}
+                {(serviceCase.status === 'Open' || serviceCase.status === 'In progress') && !task && <><p>Create a Task for the technician. The Task will carry this Case ID and move an Open Case to In progress.</p><div className="field"><label htmlFor="task-subject">Task</label><input id="task-subject" value={taskSubject} onChange={(event) => setTaskSubject(event.target.value)} /></div><div className="field-pair"><div className="field"><label htmlFor="task-assignee">Assignee</label><select id="task-assignee" value={taskAssigneeId} onChange={(event) => setTaskAssigneeId(event.target.value)}>{serviceUsers.filter((item) => item.role === 'Technician').map((item) => <option key={item.id} value={item.id}>{item.name} · Technician</option>)}</select></div><div className="field"><label htmlFor="task-due">Internal deadline</label><input id="task-due" type="datetime-local" value={taskDueAt} onChange={(event) => setTaskDueAt(event.target.value)} /></div></div><button className="primary-button" onClick={createTask}><Plus size={16} /> Create Task</button></>}
+                {serviceCase.status === 'In progress' && task?.status === 'Open' && <><p>Sanjay can coordinate site access with Ravi if needed. Open his Task to record the work; its due time is an internal deadline, not a confirmed appointment.</p><button className="primary-button" onClick={() => onOpenTask(task.id)}><Wrench size={16} /> Open technician Task</button></>}
+                {(serviceCase.status === 'In progress' || serviceCase.status === 'Waiting') && task?.status === 'Completed' && <><p>Review Sanjay’s completed Task and work note under Related work, then resolve the Case.</p><div className="field"><label htmlFor="resolution-code">Resolution code</label><select id="resolution-code" value={resolutionCode} onChange={(event) => setResolutionCode(event.target.value)}><option value="">Choose a code</option><option value="Repair completed">Repair completed</option><option value="No fault found">No fault found</option></select></div><div className="field"><label htmlFor="resolution-summary">Resolution summary</label><textarea id="resolution-summary" rows={4} value={resolutionSummary} onChange={(event) => setResolutionSummary(event.target.value)} placeholder="What was done and what was verified?" /></div><button className="primary-button" onClick={saveResolution}><CheckCircle2 size={16} /> Resolve Case</button></>}
                 {serviceCase.status === 'Resolved' && !serviceCase.customerUpdateAt && <><p>Open Ravi’s conversation through his Contact and send a manual update about the repair. Then return to this Case through Related Cases and record that you sent it.</p><button className="primary-button" onClick={onOpenConversation}><MessageSquareText size={16} /> Open Ravi’s conversation</button><div className="manual-update-confirmation"><label><input type="checkbox" checked={updateConfirmed} disabled={!customerUpdateSent} onChange={(event) => setUpdateConfirmed(event.target.checked)} /> I sent Ravi a repair update in Conversations.</label><button className="secondary-button" onClick={onConfirmCustomerUpdate} disabled={!customerUpdateSent || !updateConfirmed}>Record customer updated</button><span>{customerUpdateSent ? 'The WhatsApp message is sent. Record the confirmation separately on this Case.' : 'Send the WhatsApp update first. Sending does not update this Case automatically.'}</span></div></>}
                 {serviceCase.status === 'Resolved' && serviceCase.customerUpdateAt && <><p>The customer update confirmation is recorded. Close this Case to finish the journey.</p><button className="primary-button" onClick={onCloseCase}><CheckCircle2 size={16} /> Close Case</button></>}
                 {serviceCase.status === 'Closed' && <p>The repair, customer update and closure are recorded on this Case.</p>}
@@ -204,8 +174,7 @@ export function CaseJourneyView({
 
                 <section className="case-related-section" aria-label="Related work">
                   <h3>Related work</h3>
-                  {caseTasks.length ? caseTasks.map((item) => <div className="case-related-row" key={item.id}><span>Task · {item.id}</span><strong>{item.subject} <em className={item.status === 'Completed' ? 'task-state task-state--done' : 'task-state'}>{item.status}</em></strong><small>Assigned to {serviceUsers.find((user) => user.id === item.assigneeId)?.name ?? 'Unknown'} · Due {formatDateTime(item.dueAt)}</small>{item.completedAt && <div className="work-note"><strong>Technician work note</strong><p>{item.workNote}</p><small>Completed {formatDateTime(item.completedAt)}</small></div>}</div>) : <div className="case-related-row"><span>Tasks</span><strong>No Task created yet</strong></div>}
-                  <div className="case-related-row"><span>Services booking · manual reference</span><strong>{serviceCase.bookingReferenceId ?? 'No booking ID recorded'}</strong>{serviceCase.bookingReferenceId && <small>Separate Services record; ID entered on this Case</small>}</div>
+                  {caseTasks.length ? caseTasks.map((item) => <div className="case-related-row" key={item.id}><span>Task · {item.id}</span><strong>{item.subject} <em className={item.status === 'Completed' ? 'task-state task-state--done' : 'task-state'}>{item.status}</em></strong><small>Assigned to {serviceUsers.find((user) => user.id === item.assigneeId)?.name ?? 'Unknown'} · Internal deadline {formatDateTime(item.dueAt)}</small>{item.completedAt && <div className="work-note"><strong>Technician work note</strong><p>{item.workNote}</p><small>Completed {formatDateTime(item.completedAt)}</small></div>}</div>) : <div className="case-related-row"><span>Tasks</span><strong>No Task created yet</strong></div>}
                 </section>
               </div>
 
@@ -224,37 +193,16 @@ export function CaseJourneyView({
             </div>
           </div>
         </div>
-        <div className="saved-boundary"><CircleHelp size={17} /> The Task belongs to this Case. The Services booking is referenced by a manually entered ID. Ravi’s WhatsApp conversation is reached through his Contact.</div>
+        <div className="saved-boundary"><CircleHelp size={17} /> The Task belongs to this Case. Ravi’s WhatsApp conversation is reached through his Contact.</div>
       </div>
     </main>
   )
 }
 
-export function BookingView({ contact, asset, createdBooking, onSave, onBack }: {
-  contact: Contact
-  asset: CustomerAsset
-  createdBooking: ServicesBooking | null
-  onSave: (scheduledAt: string, location: string) => void
-  onBack: () => void
-}) {
-  const [scheduledAt, setScheduledAt] = useState(localDateTimeInput(new Date(Date.now() + 24 * 60 * 60 * 1000)))
-  const [location, setLocation] = useState(`${contact.company} · ${asset.location}`)
-  const [error, setError] = useState('')
-
-  function save() {
-    if (!scheduledAt || Number.isNaN(Date.parse(scheduledAt)) || !location.trim()) {
-      setError('Choose a visit time and location.')
-      return
-    }
-    onSave(new Date(scheduledAt).toISOString(), location.trim())
-  }
-
-  return <main className="draft-view" aria-labelledby="booking-view-title"><div className="draft-topbar"><button className="back-link" onClick={onBack}><ArrowLeft size={17} /> Back to Case</button><span className="draft-status"><span /> Services booking</span></div><div className="draft-content"><div className="draft-breadcrumb">Services <ChevronRight size={14} /> On-site visit</div><div className="draft-hero"><div className="draft-hero-icon"><CalendarDays size={24} /></div><div><span className="panel-kicker">SERVICES</span><h1 id="booking-view-title">On-site visit</h1><p>A separate booking record for {contact.name} and {asset.name}.</p></div></div><div className="standalone-card draft-form-card">{createdBooking ? <><div className="booking-success-icon"><CheckCircle2 size={23} /></div><h2>Booking created</h2><p>The Services booking has its own ID: <strong>{createdBooking.id}</strong>.</p><div className="detail-line"><span>Visit</span><strong>{formatDateTime(createdBooking.scheduledAt)}</strong></div><div className="detail-line"><span>Location</span><strong>{createdBooking.location}</strong></div><p className="booking-boundary">This booking is not linked to the Case. Return and manually record {createdBooking.id} on SC-104.</p><button className="primary-button" onClick={onBack}>Return to Case</button></> : <><div className="form-card-heading"><h2>Visit details</h2><span>Separate Services record</span></div><div className="draft-context-row"><span>Customer</span><strong>{contact.name}</strong></div><div className="draft-context-row"><span>Asset</span><strong>{asset.id} · {asset.name}</strong></div><div className="field"><label htmlFor="visit-time">Visit time</label><input id="visit-time" type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} /></div><div className="field"><label htmlFor="visit-location">Location</label><input id="visit-location" value={location} onChange={(event) => setLocation(event.target.value)} /></div>{error && <span className="field-error" role="alert">{error}</span>}<button className="primary-button" onClick={save}><Plus size={16} /> Book on-site visit</button><p className="booking-boundary">The booking receives its own ID. It will not appear on the Case until Priya enters that ID there.</p></>}</div></div></main>
-}
 
 export function TechnicianTaskView({ task, onComplete, onBack }: { task: ServiceTask; onComplete: (note: string) => void; onBack: () => void }) {
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const assignee = serviceUsers.find((item) => item.id === task.assigneeId)
-  return <main className="draft-view" aria-labelledby="technician-task-title"><div className="draft-topbar"><button className="back-link" onClick={onBack}><ArrowLeft size={17} /> Back to Case</button><span className="draft-status"><span /> Technician Task</span></div><div className="draft-content"><div className="draft-breadcrumb">Tasks <ChevronRight size={14} /> {task.id}</div><div className="demo-role-banner"><span className="demo-role-avatar">SR</span><div><strong>Viewing as {assignee?.name ?? 'Sanjay Rao'} · Technician</strong><span>Demo role switch · Back to Case returns to Priya Nair.</span></div></div><div className="draft-hero"><div className="draft-hero-icon"><ClipboardList size={24} /></div><div><span className="panel-kicker">{task.id} · CASE {task.caseId}</span><h1 id="technician-task-title">{task.subject}</h1><p>Assigned to {assignee?.name ?? 'Technician'} · Due {formatDateTime(task.dueAt)}</p></div></div><section className="standalone-card draft-form-card"><div className="form-card-heading"><h2>Complete the work</h2><span>Technician work note</span></div><p className="work-instruction">Record what was repaired and how cooling was verified.</p><div className="field"><label htmlFor="technician-note">Work note</label><textarea id="technician-note" rows={5} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Describe the repair and verification" /></div>{error && <span className="field-error" role="alert">{error}</span>}<button className="primary-button" onClick={() => { if (!note.trim()) { setError('Enter a work note before completing the Task.'); return } onComplete(note.trim()) }}><CheckCircle2 size={16} /> Complete Task</button></section></div></main>
+  return <main className="draft-view" aria-labelledby="technician-task-title"><div className="draft-topbar"><button className="back-link" onClick={onBack}><ArrowLeft size={17} /> Back to Case</button><span className="draft-status"><span /> Technician Task</span></div><div className="draft-content"><div className="draft-breadcrumb">Tasks <ChevronRight size={14} /> {task.id}</div><div className="demo-role-banner"><span className="demo-role-avatar">SR</span><div><strong>Viewing as {assignee?.name ?? 'Sanjay Rao'} · Technician</strong><span>Demo role switch · Back to Case returns to Arun Mehta.</span></div></div><div className="draft-hero"><div className="draft-hero-icon"><ClipboardList size={24} /></div><div><span className="panel-kicker">{task.id} · CASE {task.caseId}</span><h1 id="technician-task-title">{task.subject}</h1><p>Assigned to {assignee?.name ?? 'Technician'} · Internal deadline {formatDateTime(task.dueAt)}</p></div></div><section className="standalone-card draft-form-card"><div className="form-card-heading"><h2>Complete the work</h2><span>Technician work note</span></div><p className="work-instruction">Coordinate site access with Ravi if needed, then record what was repaired and how cooling was verified. The deadline is internal, not a confirmed appointment.</p><div className="field"><label htmlFor="technician-note">Work note</label><textarea id="technician-note" rows={5} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Describe the repair and verification" /></div>{error && <span className="field-error" role="alert">{error}</span>}<button className="primary-button" onClick={() => { if (!note.trim()) { setError('Enter a work note before completing the Task.'); return } onComplete(note.trim()) }}><CheckCircle2 size={16} /> Complete Task</button></section></div></main>
 }
